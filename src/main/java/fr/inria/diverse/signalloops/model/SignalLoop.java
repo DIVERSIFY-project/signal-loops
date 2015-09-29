@@ -5,10 +5,7 @@ import spoon.reflect.code.CtVariableAccess;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 /**
  * Created by marodrig on 02/09/2015.
@@ -56,7 +53,7 @@ public class SignalLoop implements PersistentObject {
     private static String INSERT_QUERY =
             "INSERT OR REPLACE INTO " + TABLE_NAME + " VALUES (%d,'%s','%s',%d,%d,%d,%f,%d, %d,%d,%d,%d,%f,%f,%f,%f,%f,%d);";
 
-    CtLoop loop;
+    CtLoop loop = null;
 
     List<CtVariableAccess> accesses;
 
@@ -81,6 +78,14 @@ public class SignalLoop implements PersistentObject {
 
     public String getDegradedSnippet() {
         return degradedSnippet;
+    }
+
+    /**
+     * Obtains the microbenchmark class name for this signal loop
+     * @return
+     */
+    public String getMicrobenchmarkClassName() {
+        return getPosition().replace(".", "_").replace(":", "_");
     }
 
     public static class Loader implements PersistentObjectLoader {
@@ -147,6 +152,7 @@ public class SignalLoop implements PersistentObject {
     }
 
     public List<CtVariableAccess> getAccesses() {
+        if (accesses == null) accesses = new ArrayList<CtVariableAccess>();
         return accesses;
     }
 
@@ -166,7 +172,8 @@ public class SignalLoop implements PersistentObject {
         this.loop = loop;
     }
 
-    public HashSet<CtVariableAccess> getInitialized() {
+    public Set<CtVariableAccess> getInitialized() {
+        if (initialized == null) initialized = new HashSet<CtVariableAccess>();
         return initialized;
     }
 
@@ -292,6 +299,9 @@ public class SignalLoop implements PersistentObject {
     }
 
     public String getPosition() {
+        if ( position == null )
+            position = getLoop().getPosition().getCompilationUnit().getMainType().getQualifiedName() +
+                    ":"+ getLoop().getPosition().getLine();
         return position;
     }
 

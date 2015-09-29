@@ -12,7 +12,8 @@ public class Main {
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
                 <#list classes as klazz>
-                        .include(${klazz}.class.getSimpleName())
+                        .include(${klazz}_ORIGINAL.class.getSimpleName())
+                        .include(${klazz}_GRACEFULLY.class.getSimpleName())
                 </#list>
                 .warmupIterations(5)
                 .measurementIterations(5)
