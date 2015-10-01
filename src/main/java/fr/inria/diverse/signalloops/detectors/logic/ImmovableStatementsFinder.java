@@ -1,4 +1,4 @@
-package fr.inria.diverse.signalloops.detectors;
+package fr.inria.diverse.signalloops.detectors.logic;
 
 /**
  * Class that detect immovable statements within a loop body

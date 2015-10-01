@@ -160,7 +160,7 @@ public class SignalLoop implements PersistentObject {
         return name;
     }
 
-    public void setMicroBenchMarkName(String name) {
+    public void setName(String name) {
         this.name = name;
     }
 

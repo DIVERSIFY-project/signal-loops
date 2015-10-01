@@ -1,5 +1,8 @@
 package fr.inria.diverse.signalloops.programs;
 
+import fr.inria.diverse.signalloops.codegenerators.MainClassGenerator;
+import fr.inria.diverse.signalloops.codegenerators.MicrobenchmarkGenerator;
+import fr.inria.diverse.signalloops.codegenerators.TestForMicrobenchmarkGenerator;
 import fr.inria.diverse.signalloops.detectors.LoopInputsDetector;
 import fr.inria.diverse.signalloops.loggers.LightLog;
 import fr.inria.diverse.signalloops.loggers.buildMicrobenchmark.Log;
@@ -75,23 +78,51 @@ public class BuildMicroBenchmark {
 
         String generationOutputPath = "C:\\MarcelStuff\\PROJECTS\\preforation-benchmark\\src\\main\\java\\fr\\inria\\diverse\\perfbench";
         String generationOutputTestPath = "C:\\MarcelStuff\\PROJECTS\\preforation-benchmark\\src\\test\\java\\fr\\inria\\diverse\\perfbench";
-        String dataOutputPath = "C:\\MarcelStuff\\DATA\\DIVERSE\\logs\\input-data";
+        String dataInputPath = "C:\\MarcelStuff\\DATA\\DIVERSE\\logs\\input-data";
+        String databaseOutputPath = "C:\\MarcelStuff\\DATA\\DIVERSE\\PREFORATION\\perforationresults.s3db";
         String packageName = "fr.inria.diverse.perfbench";
         generateMicrobenchmarks(packageName, generationOutputPath,
-                generationOutputTestPath, dataOutputPath, inputs.getResults());
+                generationOutputTestPath, dataInputPath, databaseOutputPath, inputs.getResults());
     }
 
-    public void generateMicrobenchmarks(String packageName, String generationOutputPath, String generationOutputTestPath,
-                                        String dataOutputPath, Collection<SignalLoop> loops) throws FileNotFoundException {
-        for (SignalLoop loop : loops) {
-            generateMicrobenchmarkAndTest(packageName, generationOutputPath, generationOutputTestPath, dataOutputPath, loop);
+    public void generateMicrobenchmarks(String packageName, String generationOutputPath,
+                                        String generationOutputTestPath, String datainputPath,
+                                        String databaseOutputPath,
+                                        Collection<SignalLoop> loops) throws FileNotFoundException {
+        try {
+            String templatePath = Thread.currentThread().getContextClassLoader().getResource("templates").toURI().getPath();
+
+            MicrobenchmarkGenerator benchmarkGen = new MicrobenchmarkGenerator();
+            MainClassGenerator mainGen = new MainClassGenerator();
+            TestForMicrobenchmarkGenerator testGen = new TestForMicrobenchmarkGenerator();
+
+            log.info("Initializing templates");
+
+            mainGen.initialize(templatePath);
+            benchmarkGen.initialize(templatePath);
+            testGen.initialize(templatePath);
+
+            log.info("Building benchmarks");
+
+            for (SignalLoop loop : loops) {
+                benchmarkGen.generate(packageName, generationOutputPath, datainputPath, loop, false);
+                benchmarkGen.generate(packageName, generationOutputPath, datainputPath, loop, true);
+                testGen.generate(packageName, generationOutputTestPath, datainputPath, loop);
+            }
+
+            log.info("Building main files");
+
+            //Generate main
+            mainGen.generate(packageName, generationOutputPath, datainputPath, databaseOutputPath, loops);
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-        generateMainClass(packageName, generationOutputPath, dataOutputPath, loops);
     }
 
     public void generateMicrobenchmarkAndTest(String packageName, String generationOutputPath,
-                                       String generationOutputTestPath, String dataOutputPath,
-                                       SignalLoop signalLoop) throws FileNotFoundException {
+                                              String generationOutputTestPath, String dataOutputPath,
+                                              SignalLoop signalLoop) throws FileNotFoundException {
         generateBenchMark(packageName, generationOutputPath, dataOutputPath, signalLoop, false);
         generateBenchMark(packageName, generationOutputPath, dataOutputPath, signalLoop, true);
         generateUnitTests(generationOutputTestPath, dataOutputPath, signalLoop);
@@ -207,7 +238,7 @@ public class BuildMicroBenchmark {
      * @throws java.io.FileNotFoundException
      */
     public void generateBenchMark(String packageName, String generationPath,
-                                   String dataPath, SignalLoop loop, boolean degraded) throws FileNotFoundException {
+                                  String dataPath, SignalLoop loop, boolean degraded) throws FileNotFoundException {
 
         String className = getInputClassName(loop);
         if (!existsDataFile(dataPath, className)) return;
@@ -255,7 +286,7 @@ public class BuildMicroBenchmark {
 
         //Create the benchmark method
         sb.append(pad(4)).append("@Benchmark\n");
-        if ( degraded ) sb.append(pad(4)).append("public void ").append(className).append("_GRACEFULLY() {\n");
+        if (degraded) sb.append(pad(4)).append("public void ").append(className).append("_GRACEFULLY() {\n");
         else sb.append(pad(4)).append("public void ").append(className).append("_ORIGINAL() {\n");
 
         String loopStr = getLoopPrettyPrint(loop, degraded);
@@ -333,7 +364,7 @@ public class BuildMicroBenchmark {
         String loopStr = loop.getLoop().toString();
         loopStr = loopStr.replace("\r\n", "\r\n" + pad(8));
         StringBuilder sb = new StringBuilder();
-        if ( degraded ) {
+        if (degraded) {
             //TODO: Have into consideration the case where there is only one line (no final })
             sb.append(pad(8)).append(loopStr.substring(0, loopStr.length() - 1)).append("\n");//eliminate last "}"
             sb.append(pad(8)).append(loop.getDegradedSnippet()).append("}\n");

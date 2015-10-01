@@ -221,10 +221,12 @@ public class LoopPerforation {
                     BuildMicroBenchmark benchmark = new BuildMicroBenchmark();
                     String generationOutputPath = "C:\\MarcelStuff\\PROJECTS\\preforation-benchmark\\src\\main\\java\\fr\\inria\\diverse\\perfbench";
                     String generationOutputTestPath = "C:\\MarcelStuff\\PROJECTS\\preforation-benchmark\\src\\test\\java\\fr\\inria\\diverse\\perfbench";
-                    String dataOutputPath = "C:\\MarcelStuff\\DATA\\DIVERSE\\logs\\input-data";
+                    String dataInputPath = "C:\\MarcelStuff\\DATA\\DIVERSE\\logs\\input-data";
+                    String databaseOutputPath = "C:\\MarcelStuff\\DATA\\DIVERSE\\PREFORATION\\perforationresults.s3db";
                     String packageName = "fr.inria.diverse.perfbench";
                     benchmark.generateMicrobenchmarks(packageName, generationOutputPath,
-                            generationOutputTestPath, dataOutputPath, signalDetector.getSignalLoops().values());
+                            generationOutputTestPath, dataInputPath, databaseOutputPath,
+                            signalDetector.getSignalLoops().values());
                     //Keep generating progressively
                     //benchmark.generateMainClass(packageName, generationOutputPath, dataOutputPath, signalLoops);
                 } else {

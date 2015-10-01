@@ -99,7 +99,7 @@ public class LoopInputsDetector extends Detector<CtLoop> {
 
         inputs.setLoop(loop);
         inputs.setAccesses(access);
-        inputs.setMicroBenchMarkName(loop.getPosition().getCompilationUnit().
+        inputs.setName(loop.getPosition().getCompilationUnit().
                 getMainType().getQualifiedName().replace(".", "_") + "_" + loop.getPosition().getLine());
         for (CtVariableAccess a : access) {
             if (isInitialized(a, loop)) inputs.getInitialized().add(a);

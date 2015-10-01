@@ -1,5 +1,6 @@
 package fr.inria.diverse.signalloops;
 
+import fr.inria.diverse.signalloops.codegenerators.MainClassGenerator;
 import fr.inria.diverse.signalloops.codegenerators.MicrobenchmarkGenerator;
 import fr.inria.diverse.signalloops.model.SignalLoop;
 import fr.inria.diversify.syringe.SpoonMetaFactory;
@@ -12,19 +13,17 @@ import spoon.reflect.code.CtVariableAccess;
 import spoon.reflect.factory.Factory;
 import spoon.reflect.visitor.filter.TypeFilter;
 import spoon.support.QueueProcessingManager;
-import spoon.support.reflect.code.CtVariableAccessImpl;
-import spoon.support.reflect.reference.CtTypeReferenceImpl;
+
 import java.util.ArrayList;
 import java.util.List;
 
+import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 
 /**
  * Created by marodrig on 28/09/2015.
  */
-public class MicrobenchmarkGeneratorTest extends BenchmarkTest {
-
-    SignalLoop theLoop;
+public class MainClassGeneratorTest extends BenchmarkTest{
 
     @Before
     public void setup() throws Exception {
@@ -33,18 +32,16 @@ public class MicrobenchmarkGeneratorTest extends BenchmarkTest {
 
     @Test
     public void testBenchmarkOriginall() throws Exception {
-        MicrobenchmarkGenerator generator = new MicrobenchmarkGenerator();
+        MainClassGenerator generator = new MainClassGenerator();
         generator.setWriteToFile(false);
         generator.initialize(Thread.currentThread().getContextClassLoader().getResource("templates").toURI().getPath());
-        generator.generate("fr.mypackage", "/output_sources", "/generated/path", theLoop, false);
-
+        ArrayList<SignalLoop> loops = new ArrayList<SignalLoop>();
+        loops.add(theLoop);
+        generator.generate("fr.mypackage", "/output_sources", "/generated/path", "/dbpath.sb3", loops);
 
         //System.out.println(generator.getOutput());
-
-        assertTrue(generator.getOutput().contains("package fr.mypackage"));
-        assertTrue(generator.getOutput().contains("class fr_inria_juncoprovider_testproject_Arithmetic"));
-        assertTrue(generator.getOutput().contains("static final String INPUT_DATA_FILE = \"fr-inria-juncoprovider-testproject-Arithmetic-18\";"));
-        assertTrue(generator.getOutput().contains("int a ;"));
-        assertTrue(generator.getOutput().contains("b = Loader.readint(s);"));
+        boolean contains = generator.getOutput().contains(
+                ".include(fr_inria_juncoprovider_testproject_Arithmetic_18_ORIGINAL");
+        assertEquals(true, contains);
     }
 }

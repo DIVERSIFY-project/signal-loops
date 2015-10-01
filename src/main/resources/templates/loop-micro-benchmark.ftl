@@ -7,13 +7,13 @@ import java.io.DataInputStream;
  *  ${class_comments}
  */
 @State(Scope.Thread)
-public class ${class_name} {
+public class ${class_name}_${degraded_type} {
 
     static final String INPUT_ROOT_FOLDER = "${input_root_folder_path}";
     static final String INPUT_DATA_FILE = "${input_data_file_path}";
 
 <#list input_vars as input_var>
-    ${input_var.variableType} ${input_var.variableName} ;
+    public ${input_var.variableType} ${input_var.variableName} ;
 </#list>
 
     @Setup(Level.Invocation)
@@ -31,8 +31,10 @@ public class ${class_name} {
         } catch(Exception e) { throw new RuntimeException(e); }
     }
 
+    ${static_methods}
+
     @Benchmark
-    public void ${class_name}_${degraded_type}() {
+    public void doBenchmark() {
     ${loop_code}
     }
 }

@@ -1,4 +1,4 @@
-package fr.inria.diverse.signalloops.detectors;
+package fr.inria.diverse.signalloops.detectors.logic;
 
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;

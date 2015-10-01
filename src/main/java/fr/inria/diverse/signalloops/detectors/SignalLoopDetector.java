@@ -1,5 +1,7 @@
 package fr.inria.diverse.signalloops.detectors;
 
+import fr.inria.diverse.signalloops.detectors.logic.DefUseChainCycleDetectorFactory;
+import fr.inria.diverse.signalloops.detectors.logic.StatementCounterVisitor;
 import fr.inria.diverse.signalloops.model.SignalLoop;
 import fr.inria.diversify.syringe.detectors.LoopDetect;
 import fr.inria.diversify.syringe.injectors.Injector;
