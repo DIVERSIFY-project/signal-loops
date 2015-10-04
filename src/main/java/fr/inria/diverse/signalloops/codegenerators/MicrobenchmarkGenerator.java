@@ -167,6 +167,8 @@ public class MicrobenchmarkGenerator extends BenchmarkGenerator {
         input.put("input_data_file_path", loop.getMicrobenchmarkClassName().replace("_", "-"));
         input.put("class_name", loop.getMicrobenchmarkClassName());
         input.put("input_vars", getInjectionInputVariables(loop));
+        //input.put("signal_array_type", loop.getSignalArray().getType() + "[]");
+        //input.put("signal_array", loop.getSignalArray().getTarget().toString());
 
         //Get static methods
         StringBuilder staticMethodsPrint = new StringBuilder();

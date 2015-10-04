@@ -13,6 +13,7 @@ import fr.inria.diversify.syringe.SyringeInstrumenterImpl;
 import fr.inria.diversify.syringe.injectors.GenericInjectWithId;
 import fr.inria.diversify.syringe.injectors.GenericInjector;
 import fr.inria.juncoprovider.XMLCoverageFinder;
+import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.xml.sax.SAXException;
@@ -33,12 +34,20 @@ import java.util.concurrent.*;
  */
 public class LoopPerforation {
 
+    static Logger log = Logger.getLogger(LoopPerforation.class);
 
     SignalLoopDetector signalDetector;
 
     ArrayList<SignalLoop> signalLoops = new ArrayList<SignalLoop>();
 
     public static String ID_FILE_NAME = "loopPerforation.id";
+
+    private static final boolean DONT_MEASURE_TIME = false;
+    private static final boolean MEASURE_TIME = true;
+    private static final boolean DONT_MEASURE_ACCURACY = false;
+    private static final boolean MEASURE_ACCURACY = true;
+    private static final boolean DONT_PERFORATE = false;
+    private static final boolean PERFORATE = true;
 
     /**
      * Configures the instrumentation
@@ -98,16 +107,24 @@ public class LoopPerforation {
         return confSrc;
     }
 
-    private void buildTheProgram(SyringeInstrumenter l, int loopId, String purpose,
-                                 String outPrjSrc, String loopPosition, SignalLoop loop) throws IOException {
+    /**
+     * Builds and executes the test suite of the program being modified
+     * @param l Instrumenter that has instrumented the program
+     * @param purpose Purpose of the build Speed measurement (build microbenchmark), or accuracy measurement
+     * @param outPrjSrc Output folder of the program being built
+     * @param loop
+     * @throws IOException
+     */
+    private void buildTheProgram(SyringeInstrumenter l, String purpose,
+                                 String outPrjSrc, SignalLoop loop) throws IOException {
         //Run tests in order to make the magic happens!
         //Write the properties
-        System.out.println("+ + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + ");
-        System.out.println("B U I L D :");
-        System.out.println("Building the program for *" + purpose.toUpperCase() + "* measurements ");
-        System.out.println("Loop " + loopId + " modified ");
-        System.out.println("+ + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + ");
 
+        int loopId = loop == null ? -1 : loop.getId();
+        String loopPosition = loop == null ? "" : loop.getPosition();
+
+        log.info("Building the program for *" + purpose.toUpperCase() + "* measurements ");
+        log.info("Loop " + loopId + " modified ");
 
         Properties props = new Properties();
         DateFormat df = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, new Locale("en", "EN"));
@@ -140,7 +157,7 @@ public class LoopPerforation {
             l.runTests(true, new String[]{"test"});
             testFails = false;
         } catch (RuntimeException e) {
-            System.out.println("[ERROR] Run test: " + e.getMessage());
+            log.info("[ERROR] Run test: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -148,6 +165,11 @@ public class LoopPerforation {
 
     }
 
+    /**
+     * Saves the data of a particular loop to a DB
+     * @param loop Loop to save
+     * @param path Path to the DB
+     */
     private void saveLoopToDB(SignalLoop loop, String path) {
         //Save the loop to DB
         if (loop != null) {
@@ -166,52 +188,42 @@ public class LoopPerforation {
      * @param loopId         The ID of the loop to be instrumented. There is no way of knowing beforehand the ID of a particular
      *                       loop. However, the ID remains the same (unless the instrumented program changes) between runs
      *                       of the instrumenter. That way, we may run each loop separately
-     * @param properties     Properties of the project
+     * @param conf           Properties of the project
      * @param registerOutput Indicates if should register the outputs
      * @param perforate      Indicates if we should perforate the loop
-     * @return
+     * @return               True if there remains more loops to instrument
      * @throws Exception
      */
-    private Boolean instrumentAndRun(final int loopId, Properties properties,
+    private Boolean instrumentAndRun(final int loopId, final PerforationConfiguration conf,
                                      boolean registerOutput, boolean registerSpeed,
                                      boolean perforate, boolean build) throws Exception {
         Boolean loopFound = false;
         try {
-            String prj = properties.getProperty("project.dir");//PROJECT_DIR;
-            String prjSrc = properties.getProperty("src.dir");//SRC_DIR + "/java";
-            String resDir = properties.getProperty("res.dir");//SRC_DIR + "/java";
-            final String instrumentedPrj = properties.getProperty("out.dir");//TEST_DIR + "/java";
-            String dbPath = properties.getProperty("loopDB");//TEST_DIR + "/java";
-            String coverage = properties.getProperty("coverage");//TEST_DIR + "/java";
-
             //Configure instrumentation
             signalDetector = new SignalLoopDetector();
-            signalDetector.setPrepareMicroBenchMark(true);
+            signalDetector.setPrepareMicroBenchMark(registerSpeed);
             signalDetector.setProcessAllLoops(loopId == -1);
-            Configuration confSrc = configureInstrumenter(prjSrc, loopId, registerOutput,
+            Configuration confSrc = configureInstrumenter(conf.getProjectSource(), loopId, registerOutput,
                     registerSpeed, perforate, signalDetector);
 
             //Perform the instrumentation
-            final SyringeInstrumenter l = new SyringeInstrumenterImpl(prj, prjSrc, instrumentedPrj);
+            final SyringeInstrumenter l = new SyringeInstrumenterImpl(conf.getProjectRoot(),
+                    conf.getProjectSource(), conf.getInstrumentedProjectRoot());
             l.setOnlyCopyLogger(false);
             l.instrument(confSrc);
 
-            //The detector is programed to process only one loop at the time.
-            //Here we indicate whether more loops remains to be instrumented
+            //If the detector is configured to process only one loop at the time.
+            //Here we know whether more loops remains to be instrumented
             loopFound = signalDetector.getMoreLoopsRemain();
-
-            //
-            final String loopPosition = signalDetector.getLoopPosition();
 
             //If no signal loop where found, there is no need to build the program, its very expensive
             if (signalDetector.getSignalElementsDetected() <= 0) return loopFound;
             signalLoops.add(signalDetector.getLastLoop());
 
 
-            System.out.println("Number of signal loops: " + signalDetector.getSignalElementsDetected());
-            System.out.println("Number of loops: " + signalDetector.getElementsDetected());
+            log.info("Number of signal loops: " + signalDetector.getSignalElementsDetected());
+            log.info("Number of loops: " + signalDetector.getElementsDetected());
             final String intention = registerOutput ? "accuracy" : "speed";
-
 
             if ( registerSpeed && perforate ) {
                 //Build the microbenchmars
@@ -219,26 +231,9 @@ public class LoopPerforation {
                 //TODO: option this
                 if ( loopId == -1 ) {
                     BuildMicroBenchmark benchmark = new BuildMicroBenchmark();
-                    String generationOutputPath = "C:\\MarcelStuff\\PROJECTS\\preforation-benchmark\\src\\main\\java\\fr\\inria\\diverse\\perfbench";
-                    String generationOutputTestPath = "C:\\MarcelStuff\\PROJECTS\\preforation-benchmark\\src\\test\\java\\fr\\inria\\diverse\\perfbench";
-                    String dataInputPath = "C:\\MarcelStuff\\DATA\\DIVERSE\\logs\\input-data";
-                    String databaseOutputPath = "C:\\MarcelStuff\\DATA\\DIVERSE\\PREFORATION\\perforationresults.s3db";
-                    String packageName = "fr.inria.diverse.perfbench";
-                    benchmark.generateMicrobenchmarks(packageName, generationOutputPath,
-                            generationOutputTestPath, dataInputPath, databaseOutputPath,
+                    benchmark.generateMicrobenchmarks(conf.getPackageName(), conf.getGenerationOutputPath(),
+                            conf.getGenerationOutputTestPath(), conf.getDataInputPath(), conf.getDatabaseOutputPath(),
                             signalDetector.getSignalLoops().values());
-                    //Keep generating progressively
-                    //benchmark.generateMainClass(packageName, generationOutputPath, dataOutputPath, signalLoops);
-                } else {
-                    BuildMicroBenchmark benchmark = new BuildMicroBenchmark();
-                    String generationOutputPath = "C:\\MarcelStuff\\PROJECTS\\preforation-benchmark\\src\\main\\java\\fr\\inria\\diverse\\perfbench";
-                    String generationOutputTestPath = "C:\\MarcelStuff\\PROJECTS\\preforation-benchmark\\src\\test\\java\\fr\\inria\\diverse\\perfbench";
-                    String dataOutputPath = "C:\\MarcelStuff\\DATA\\DIVERSE\\logs\\input-data";
-                    String packageName = "fr.inria.diverse.perfbench";
-                    benchmark.generateMicrobenchmarkAndTest(packageName, generationOutputPath,
-                            generationOutputTestPath, dataOutputPath, signalDetector.getLastLoop());
-                    //Keep generating progressively
-                    benchmark.generateMainClass(packageName, generationOutputPath, dataOutputPath, signalLoops);
                 }
             }
 
@@ -247,12 +242,12 @@ public class LoopPerforation {
             //BUILD with time out:
             if (loopId != -1 && signalDetector.getLastLoop() != null) {
                 String className = signalDetector.getLastLoop().getPosition().split(":")[0];
-                signalDetector.getLastLoop().setNbTestCover(getNbTestCovering(coverage, className));
+                signalDetector.getLastLoop().setNbTestCover(getNbTestCovering(conf.getCoverage(), className));
                 if (signalDetector.getLastLoop().getNbTestCover() > 0) {
                     Callable<SignalLoop> buildCall = new Callable<SignalLoop>() {
                         @Override
                         public SignalLoop call() throws Exception {
-                            buildTheProgram(l, loopId, intention, instrumentedPrj, loopPosition, signalDetector.getLastLoop());
+                            buildTheProgram(l, intention, conf.getInstrumentedProjectRoot(), signalDetector.getLastLoop());
                             return null;
                         }
                     };
@@ -264,18 +259,14 @@ public class LoopPerforation {
                     } catch (final TimeoutException ex) {
                         signalDetector.getLastLoop().setTestTimeOut(true);
                         signalDetector.getLastLoop().setTestFails(true);
-                        System.out.println("*********************************************");
-                        System.out.println("TIME OUT: " + loopId);
-                        System.out.println("*********************************************");
+                        log.info("TIME OUT: " + loopId);
                     } finally {
                         service.shutdown();
                     }
                 }
-            } else buildTheProgram(l, loopId, intention, instrumentedPrj, "", signalDetector.getLastLoop());
-
+            } else buildTheProgram(l, intention, conf.getInstrumentedProjectRoot(), signalDetector.getLastLoop());
             //Saving the Loop to the DB
-            saveLoopToDB(signalDetector.getLastLoop(), dbPath);
-
+            saveLoopToDB(signalDetector.getLastLoop(), conf.getDatabaseOutputPath());
         } catch (Exception e) {
             e.printStackTrace();
             loopFound = false;
@@ -292,16 +283,14 @@ public class LoopPerforation {
                 if (finder.isCovered(f.getAbsolutePath(), className)) testCovered++;
             }
         }
-        System.out.println("--------------------------------------");
-        System.out.println("[ INFO ] COVERAGE:  " + testCovered);
-        System.out.println("--------------------------------------");
+        log.info("COVERAGE:  " + testCovered);
         return testCovered;
     }
 
     private void execute(String[] args, boolean all) throws Exception {
 
         //Obtaining parameters from the property file
-        Properties properties = new Properties();
+        PerforationConfiguration properties = new PerforationConfiguration();
         properties.load(new FileInputStream(
                 LoopPerforation.class.getResource("/loop_perforation/" + args[0]).toURI().getPath()));
 
@@ -311,9 +300,9 @@ public class LoopPerforation {
         int i = 0;
         while (loopFound) {
             i++;
-            System.out.println("--------------------------------------");
-            System.out.println(" N E X T  L O O P: " + i);
-            System.out.println("--------------------------------------");
+            log.info("--------------------------------------");
+            log.info(" N E X T  L O O P: " + i);
+            log.info("--------------------------------------");
             loopFound = instrumentAndRun(i, properties, MEASURE_ACCURACY, DONT_MEASURE_TIME, DONT_PERFORATE, true); // Measure Accuracy 1
             if (signalDetector.getSignalElementsDetected() > 0) {
                 instrumentAndRun(i, properties, MEASURE_ACCURACY, DONT_MEASURE_TIME, DONT_PERFORATE, true); // Measure Accuracy 2
@@ -324,25 +313,18 @@ public class LoopPerforation {
     }
 
     public static void main(String[] args) throws Exception {
-        //new LoopPerforation().accuracyExtended(new String[]{"jsyn.properties"}, 0);
         new LoopPerforation().execute(new String[]{"jsyn.properties"}, true);
-        //new LoopPerforation().sandbox(args, 46);
     }
 
 
-    private static final boolean DONT_MEASURE_TIME = false;
-    private static final boolean MEASURE_TIME = true;
-    private static final boolean DONT_MEASURE_ACCURACY = false;
-    private static final boolean MEASURE_ACCURACY = true;
-    private static final boolean DONT_PERFORATE = false;
-    private static final boolean PERFORATE = true;
+
 
     private void sandbox(String[] args, int loopId) throws Exception {
         //Obtaining parameters from the property file
         Properties properties = new Properties();
         properties.load(new FileInputStream(LoopPerforation.class.getResource("/" + args[0]).toURI().getPath()));
         //instrumentAndRun(loopId, properties, DONT_MEASURE_ACCURACY, DONT_MEASURE_TIME, PERFORATE); // Measure time// Measure time
-        instrumentAndRun(loopId, properties, MEASURE_ACCURACY, DONT_MEASURE_TIME, PERFORATE, true); // Measure time// Measure time
+        //instrumentAndRun(loopId, properties, MEASURE_ACCURACY, DONT_MEASURE_TIME, PERFORATE, true); // Measure time// Measure time
     }
 
 }

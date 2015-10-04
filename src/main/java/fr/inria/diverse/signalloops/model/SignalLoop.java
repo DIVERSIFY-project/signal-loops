@@ -1,5 +1,7 @@
 package fr.inria.diverse.signalloops.model;
 
+import fr.inria.diverse.signalloops.detectors.SignalLoopDetector;
+import spoon.reflect.code.CtArrayAccess;
 import spoon.reflect.code.CtLoop;
 import spoon.reflect.code.CtVariableAccess;
 
@@ -23,6 +25,8 @@ public class SignalLoop implements PersistentObject {
     private double timeGain;//Time gained by the loop
     private boolean testFails;//Indicate whether the test fails or not
     private String degradedSnippet;
+
+    private CtArrayAccess signalArray;
 
     public boolean isTestTimeOut() {
         return testTimeOut;
@@ -86,6 +90,14 @@ public class SignalLoop implements PersistentObject {
      */
     public String getMicrobenchmarkClassName() {
         return getPosition().replace(".", "_").replace(":", "_");
+    }
+
+    public void setSignalArray(CtArrayAccess signalArray) {
+        this.signalArray = signalArray;
+    }
+
+    public CtArrayAccess getSignalArray() {
+        return signalArray;
     }
 
     public static class Loader implements PersistentObjectLoader {

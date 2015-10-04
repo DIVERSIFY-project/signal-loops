@@ -6,6 +6,7 @@ import fr.inria.diverse.signalloops.model.SignalLoop;
 import fr.inria.diversify.syringe.detectors.LoopDetect;
 import fr.inria.diversify.syringe.injectors.Injector;
 import fr.inria.diversify.syringe.signature.DefaultSignature;
+import org.apache.log4j.Logger;
 import org.jgrapht.alg.CycleDetector;
 import org.jgrapht.graph.DefaultEdge;
 import spoon.reflect.code.*;
@@ -30,6 +31,8 @@ import java.util.*;
  * Created by marodrig on 10/07/2015.
  */
 public class SignalLoopDetector extends LoopDetect {
+
+    private Logger log = Logger.getLogger(SignalLoopDetector.class);
 
     public static class SignalLoopSignature extends DefaultSignature {
         @Override
@@ -123,8 +126,6 @@ public class SignalLoopDetector extends LoopDetect {
     private boolean processAllLoops = false;
 
     private boolean idFound = false;
-    private String lastLoopPosition;
-
 
     /**
      * Indicates whether more signal loops remain to be found
@@ -152,17 +153,6 @@ public class SignalLoopDetector extends LoopDetect {
     }
 
     /**
-     * Get the position of the loop with id = loopID. I.e, when we want to detect only one loop, this is the position
-     * of that loop
-     *
-     * @return
-     */
-    public String getLoopPosition() {
-        return lastLoopPosition;
-    }
-
-
-    /**
      * Number of signal loops detected
      * @return
      */
@@ -186,6 +176,10 @@ public class SignalLoopDetector extends LoopDetect {
         return prepareMicroBenchMark;
     }
 
+    /**
+     * Indicate whether the processor should prepare a microbenchmark when a signal loop is detected
+     * @param prepareMicroBenchMark
+     */
     public void setPrepareMicroBenchMark(boolean prepareMicroBenchMark) {
         this.prepareMicroBenchMark = prepareMicroBenchMark;
     }
@@ -232,9 +226,6 @@ public class SignalLoopDetector extends LoopDetect {
         idFound = thisLoopId >= loopId;
     }
 
-
-
-
     /**
      * Automatic approximation of loops for DSP applications
      * <p/>
@@ -280,11 +271,9 @@ public class SignalLoopDetector extends LoopDetect {
             updateIdFound(signature);
 
             //if (block.getStatements().size() > 0) {
-            System.out.println("++++++++++++++++++++++++++++++++++++++++++++");
-            System.out.println("SIGNAL LOOP ID: " + getIdMap().get(getSignatureFromElement(loop)));
-            System.out.println("Pos: " + loop.getPosition().toString());
-            System.out.println("++++++++++++++++++++++++++++++++++++++++++++");
-            System.out.println(loop);
+            log.info("SIGNAL LOOP ID: " + getIdMap().get(getSignatureFromElement(loop)));
+            log.info("Pos: " + loop.getPosition().toString());
+            log.info(loop);
             //}
 
             //If we are in a single-shoot mode, return if this is not the loop we are looking for
@@ -292,9 +281,11 @@ public class SignalLoopDetector extends LoopDetect {
             if (!processAllLoops && loopId != getIdMap().get(signature)) return;
 
 
-            System.out.println("Start loop instrumentation");
+            log.info("Start loop instrumentation");
 
-            lastLoopPosition = loop.getPosition().getCompilationUnit().getMainType().getQualifiedName() + ":" + loop.getPosition().getLine();
+            String lastLoopPosition = loop.getPosition().getCompilationUnit().getMainType().getQualifiedName() +
+                    ":" + loop.getPosition().getLine();
+
             idFound = true;
             //Count the number of signal loops detected
             signalElementsDetected++;
@@ -302,19 +293,15 @@ public class SignalLoopDetector extends LoopDetect {
             CycleDetector<CtVariableReference, DefaultEdge> cycleDetector =
                     new DefUseChainCycleDetectorFactory().buildDetector(loopBody, localToLoop);
 
-
             //Inmutable detector BEGIN
             int up = signalStmntIndex - 1; //Find the Upper avoidable frontier of the loop
             if (up > 0) {
                 while (up >= 0 && !recursive(loopBody.getStatement(up), localToLoop, cycleDetector)) up--;
             } else up = -1;
 
-
             //Non avoidable statements before the array assign
             StringBuilder recUp = new StringBuilder();
-            for (int i = 0; i <= up; i++) {
-                printStatement(loopBody.getStatement(i), recUp);
-            }
+            for (int i = 0; i <= up; i++) printStatement(loopBody.getStatement(i), recUp);
 
             int hi = loopBody.getStatements().size() - 1;
             int down = signalStmntIndex + 1; //Find the Lower avoidable frontier of the loop
@@ -323,26 +310,24 @@ public class SignalLoopDetector extends LoopDetect {
                 if (down > hi) down = hi;
             } else down = hi;
 
-            //INMUTABLE DETECTION END
-
             StringBuilder recDown = new StringBuilder();
-            for (int i = down + 1; i < loopBody.getStatements().size(); i++) {
+            for (int i = down + 1; i < loopBody.getStatements().size(); i++)
                 printStatement(loopBody.getStatement(i), recDown);
-            }
 
             //Calculate the approximate ratio of the loop
             ApproximatedRatio ratio = countStatements(loopBody, up, down);
 
+            //INMUTABLE DETECTION END
 
-            System.out.println("--------------------------------------");
+            log.info("--------------------------------------");
             if (loopBody.getStatements().size() > 1) {
-                System.out.println("Index:       " + signalStmntIndex);
-                System.out.println("Up   :       " + up);
-                System.out.println("Down :       " + down);
-                System.out.println("Total Stmnt : " + ratio.getTotalLines());
-                System.out.println("Kept  Stmnt : " + ratio.getFixedStmnt());
+                log.info("Index:       " + signalStmntIndex);
+                log.info("Up   :       " + up);
+                log.info("Down :       " + down);
+                log.info("Total Stmnt : " + ratio.getTotalLines());
+                log.info("Kept  Stmnt : " + ratio.getFixedStmnt());
             } else {
-                System.out.println("Single line loop");
+                log.info("Single line loop");
             }
             SignalLoop signalLoop = new SignalLoop();
             signalLoop.setId(getIdMap().get(getSignatureFromElement(loop)));
@@ -354,14 +339,13 @@ public class SignalLoopDetector extends LoopDetect {
             signalLoop.setDownFix(down);
             signalLoop.setSignalLoop(true);
             signalLoop.setLoop(loop);
+            signalLoop.setSignalArray(signalParams.access);
             if ( prepareMicroBenchMark ) {
                 new LoopInputsDetector().prepareMicrobenchmarkData(signalLoop);
             }
 
             lastLoop = signalLoop;
             signalLoops.put(getIdMap().get(getSignatureFromElement(loop)), signalLoop);
-
-
 
             data.getParams().put("index_expr", signalParams.arrayIndex);
             data.getParams().put("array", signalParams.arrayName);
