@@ -2,6 +2,7 @@ package fr.inria.diverse.signalloops.loggers.buildMicrobenchmark;
 
 
 import fr.inria.diverse.signalloops.loggers.LightLog;
+
 import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -43,7 +44,8 @@ public class MicrobenchmarkLogger extends LightLog {
     }
 
 
-    public void logbyte(byte data, String name) {
+    public void logbyte(byte data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -56,7 +58,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logArraybyte(byte[] data, String name) {
+    public void logArraybyte(byte[] data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -70,7 +73,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logshort(short data, String name) {
+    public void logshort(short data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -83,7 +87,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logArrayshort(short[] data, String name) {
+    public void logArrayshort(short[] data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -97,7 +102,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logint(int data, String name) {
+    public void logint(int data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -110,7 +116,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logArrayint(int[] data, String name) {
+    public void logArrayint(int[] data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -124,7 +131,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void loglong(long data, String name) {
+    public void loglong(long data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -137,7 +145,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logArraylong(long[] data, String name) {
+    public void logArraylong(long[] data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -151,7 +160,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logfloat(float data, String name) {
+    public void logfloat(float data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -164,7 +174,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logArrayfloat(float[] data, String name) {
+    public void logArrayfloat(float[] data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -178,7 +189,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logdouble(double data, String name) {
+    public void logdouble(double data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -191,7 +203,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logArraydouble(double[] data, String name) {
+    public void logArraydouble(double[] data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -205,7 +218,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logchar(char data, String name) {
+    public void logchar(char data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -218,7 +232,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logArraychar(char[] data, String name) {
+    public void logArraychar(char[] data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -232,7 +247,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logString(String data, String name) {
+    public void logString(String data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -245,7 +261,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logArrayString(String[] data, String name) {
+    public void logArrayString(String[] data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -259,7 +276,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logboolean(boolean data, String name) {
+    public void logboolean(boolean data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -272,7 +290,8 @@ public class MicrobenchmarkLogger extends LightLog {
 
     ;
 
-    public void logArrayboolean(boolean[] data, String name) {
+    public void logArrayboolean(boolean[] data, String name, boolean after) {
+        if (after) name = "after-" + name;
         if (varRegistered.contains(name)) return;
         varRegistered.add(name);
         try {
@@ -283,6 +302,8 @@ public class MicrobenchmarkLogger extends LightLog {
             throw new RuntimeException(e);
         }
     }
+
+    ;
 
     private DataOutputStream getStream(String name) {
         name = name.substring(0, name.lastIndexOf("-")) + "--" +

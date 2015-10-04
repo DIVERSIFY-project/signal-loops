@@ -16,10 +16,12 @@ public class TestForMicrobenchmarkGenerator extends BenchmarkGenerator {
 
         HashMap<String, Object> input = new HashMap<String, Object>();
         input.put("package_name", packageName);
-        input.put("data_path", dataPath);
+        input.put("data_root_folder_path", dataPath.replace("\\", "/"));
+        input.put("data_file_path", loop.getMicrobenchmarkClassName().replace("_", "-"));
         input.put("generator", this);
         input.put("class_name", loop.getMicrobenchmarkClassName());
         input.put("loop", loop);
+        input.put("input_vars", getInjectionInputVariables(loop));
         generateOutput(input, "test-loop-micro-benchmark.ftl", writeToFile,
                 generationOutputTestPath + "/" + loop.getMicrobenchmarkClassName() + "Test.java");
     }

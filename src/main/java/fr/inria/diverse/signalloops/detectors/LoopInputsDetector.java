@@ -25,8 +25,9 @@ import java.util.*;
 public class LoopInputsDetector extends Detector<CtLoop> {
 
 
+    public static final String AFTER_INPUTS = "@LoopInputs.BEFORE@";
     //Injectors to inject just before the loop
-    public static String INPUTS = "@LoopInputs.BEFORE@";
+    public static final String INPUTS = "@LoopInputs.BEFORE@";
 
     public static final String END_INPUTS = "@@END_INPUTS@@";
 
@@ -35,13 +36,14 @@ public class LoopInputsDetector extends Detector<CtLoop> {
      */
     protected Collection<Injector> inputInjectors;
 
-
-    private Collection<Injector> degradationInjectors;
-
-    private List<SignalLoop> results = new ArrayList<SignalLoop>();
+    /**
+     * Injectors to collect after the loop block
+     */
+    protected Collection<Injector> afterInputInjectors;
 
     private Collection<Injector> endInjectors;
 
+    private List<SignalLoop> results = new ArrayList<SignalLoop>();
 
     int loopIndex = 0;
     private SignalLoop signalLoop;
@@ -136,6 +138,7 @@ public class LoopInputsDetector extends Detector<CtLoop> {
 
         //
         StringBuilder sb = new StringBuilder(buildSnippet(input, inputInjectors));
+        sb.append(buildSnippet(input, afterInputInjectors));
         //Build the injection at the end
         String snippet = getSnippet(endInjectors, loop, data);
         if (snippet != null && !snippet.isEmpty()) sb.append(snippet);
@@ -149,13 +152,6 @@ public class LoopInputsDetector extends Detector<CtLoop> {
         int indexSp = sp.getSourceStart();
         CompilationUnit cu = sp.getCompilationUnit();
         cu.addSourceCodeFragment(new SourceCodeFragment(indexSp, sb.toString(), 0));
-
-        /*
-        SignalLoopDetector detector = new SignalLoopDetector();
-        detector.setInjectors(degradationInjectors);
-        detector.setProcessAllLoops(true);
-
-        detector.process(loop);*/
     }
 
     /**
@@ -296,8 +292,8 @@ public class LoopInputsDetector extends Detector<CtLoop> {
      */
     private String getSignatureOfVar(CtVariableAccess a, CtLoop loop) {
         SourcePosition pos = loop.getPosition();
-        return "\"" + pos.getCompilationUnit().getMainType().getQualifiedName().replace(".", "-") + "-" + pos.getLine() +
-                "-" + a.getVariable().toString() + "\"";
+        return pos.getCompilationUnit().getMainType().getQualifiedName().replace(".", "-") + "-" + pos.getLine() +
+                "-" + a.getVariable().toString();
     }
 
     /**

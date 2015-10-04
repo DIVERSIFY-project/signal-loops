@@ -23,37 +23,6 @@ import java.util.List;
 public class MicrobenchmarkGenerator extends BenchmarkGenerator {
 
     /**
-     * Build the set of template wrappers for the input variables of the loop
-     *
-     * @return
-     */
-    private ArrayList<TemplateInputVariable> getInjectionInputVariables(SignalLoop loop) {
-        ArrayList<TemplateInputVariable> result = new ArrayList<TemplateInputVariable>();
-        for (CtVariableAccess access : loop.getAccesses()) {
-            TemplateInputVariable var = new TemplateInputVariable();
-            var.setInitialized(loop.getInitialized().contains(access));
-            var.setVariableName(accessPrettyPrint(access));
-            var.setVariableType(access.getVariable().getType().toString());
-            if (access.getVariable().getType() instanceof CtArrayTypeReference) {
-                CtArrayTypeReference ref = (CtArrayTypeReference) access.getVariable().getType();
-                var.setLoadMethodName("Array" + ref.getComponentType().toString());
-            } else var.setLoadMethodName(access.getType().toString());
-            result.add(var);
-        }
-        return result;
-    }
-
-    /**
-     * Pretty print a variable access
-     *
-     * @param access
-     * @return
-     */
-    private String accessPrettyPrint(CtVariableAccess access) {
-        return LoopInputsDetector.getCompilableName(access).replace(".", "_");
-    }
-
-    /**
      * Pretty print the loop, basically substitute static private method for our public of the methods
      * and static fields for our public copy of the static field
      *
@@ -163,8 +132,8 @@ public class MicrobenchmarkGenerator extends BenchmarkGenerator {
         HashMap<String, Object> input = new HashMap<String, Object>();
         input.put("package_name", packageName);
         input.put("class_comments", "Loop ID: " + loop.getId());
-        input.put("input_root_folder_path", dataPath.replace("\\", "/"));
-        input.put("input_data_file_path", loop.getMicrobenchmarkClassName().replace("_", "-"));
+        input.put("data_root_folder_path", dataPath.replace("\\", "/"));
+        input.put("data_file_path", loop.getMicrobenchmarkClassName().replace("_", "-"));
         input.put("class_name", loop.getMicrobenchmarkClassName());
         input.put("input_vars", getInjectionInputVariables(loop));
         //input.put("signal_array_type", loop.getSignalArray().getType() + "[]");

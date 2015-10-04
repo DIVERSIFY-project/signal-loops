@@ -1,11 +1,16 @@
 package fr.inria.diverse.signalloops.codegenerators;
 
+import fr.inria.diverse.signalloops.detectors.LoopInputsDetector;
+import fr.inria.diverse.signalloops.model.SignalLoop;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
 import org.apache.log4j.Logger;
+import spoon.reflect.code.CtVariableAccess;
+import spoon.reflect.reference.CtArrayTypeReference;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
@@ -73,6 +78,41 @@ public class BenchmarkGenerator {
             log.error("Unexpected exception at existDataFile. ", e);
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Pretty print a variable access
+     *
+     * @param access
+     * @return
+     */
+    protected String accessPrettyPrint(CtVariableAccess access) {
+        return LoopInputsDetector.getCompilableName(access).replace(".", "_");
+    }
+
+    /**
+     * Build the set of template wrappers for the input variables of the loop
+     *
+     * @return
+     */
+    protected ArrayList<TemplateInputVariable> getInjectionInputVariables(SignalLoop loop) {
+        ArrayList<TemplateInputVariable> result = new ArrayList<TemplateInputVariable>();
+        for (CtVariableAccess access : loop.getAccesses()) {
+            TemplateInputVariable var = new TemplateInputVariable();
+            var.setInitialized(loop.getInitialized().contains(access));
+            var.setVariableName(accessPrettyPrint(access));
+            var.setVariableType(access.getVariable().getType().toString());
+            if (access.getVariable().getType() instanceof CtArrayTypeReference) {
+                CtArrayTypeReference ref = (CtArrayTypeReference) access.getVariable().getType();
+                var.setLoadMethodName("Array" + ref.getComponentType().toString());
+                var.setIsArray(true);
+            } else {
+                var.setIsArray(false);
+                var.setLoadMethodName(access.getType().toString());
+            }
+            result.add(var);
+        }
+        return result;
     }
 
     /**

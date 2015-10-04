@@ -31,22 +31,23 @@ public class GenerateMicrobenchmarLogger {
     public static void main(String[] args) {
 
         for (int i = 0; i < primitives.length; i++) {
-            System.out.println("public static void log" + primitives[i] + "(" + primitives[i] + " data, String name) {");
-            System.out.println("    getLog().log" + primitives[i] + "(data, name);");
+            System.out.println("public static void log" + primitives[i] + "(" + primitives[i] + " data, String name, boolean after) {");
+            System.out.println("    getLog().log" + primitives[i] + "(data, name, after);");
             System.out.println("}");
         }
 
         for (int i = 0; i < primitives.length; i++) {
-            System.out.println("public  static void logArray" + primitives[i] + "(" + primitives[i] + "[] data, String name) {");
-            System.out.println("    getLog().logArray" + primitives[i] + "(data, name);");
+            System.out.println("public  static void logArray" + primitives[i] + "(" + primitives[i] + "[] data, String name, boolean after) {");
+            System.out.println("    getLog().logArray" + primitives[i] + "(data, name, after);");
             System.out.println("}");
         }
 
         System.out.println("--------------------------------------------------------------");
 
         for (int i = 0; i < primitives.length; i++) {
-            System.out.println("public void log" + primitives[i] + "(" + primitives[i] + " data, String name) {");
+            System.out.println("public void log" + primitives[i] + "(" + primitives[i] + " data, String name, boolean after) {");
             System.out.println(
+                    "if (after) name = \"after-\" + name; \n" +
                     "if (varRegistered.contains(name)) return;\n" +
                             "            varRegistered.add(name);");
             System.out.println("try {\n" +
@@ -58,8 +59,9 @@ public class GenerateMicrobenchmarLogger {
                     "        }" +
                     "};");
 
-            System.out.println("public void logArray" + primitives[i] + "(" + primitives[i] + "[] data, String name) {");
+            System.out.println("public void logArray" + primitives[i] + "(" + primitives[i] + "[] data, String name, boolean after) {");
             System.out.println(
+                    "if (after) name = \"after-\" + name; \n" +
                     "if (varRegistered.contains(name)) return;\n" +
                             "            varRegistered.add(name);");
             System.out.println("try {\n" +
@@ -72,6 +74,8 @@ public class GenerateMicrobenchmarLogger {
                     "            throw new RuntimeException(e);\n" +
                     "        }" +
                     "};");
+
+
 
         }
         System.out.println("--------------------------------------------------------------");

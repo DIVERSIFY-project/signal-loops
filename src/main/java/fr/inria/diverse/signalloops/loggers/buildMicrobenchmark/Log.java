@@ -59,76 +59,76 @@ public class Log {
         }
     }
 
-    public static void logbyte(byte data, String name) {
-        getLog().logbyte(data, name);
+    public static void logbyte(byte data, String name, boolean after) {
+        getLog().logbyte(data, name, after);
     }
 
-    public static void logshort(short data, String name) {
-        getLog().logshort(data, name);
+    public static void logshort(short data, String name, boolean after) {
+        getLog().logshort(data, name, after);
     }
 
-    public static void logint(int data, String name) {
-        getLog().logint(data, name);
+    public static void logint(int data, String name, boolean after) {
+        getLog().logint(data, name, after);
     }
 
-    public static void loglong(long data, String name) {
-        getLog().loglong(data, name);
+    public static void loglong(long data, String name, boolean after) {
+        getLog().loglong(data, name, after);
     }
 
-    public static void logfloat(float data, String name) {
-        getLog().logfloat(data, name);
+    public static void logfloat(float data, String name, boolean after) {
+        getLog().logfloat(data, name, after);
     }
 
-    public static void logdouble(double data, String name) {
-        getLog().logdouble(data, name);
+    public static void logdouble(double data, String name, boolean after) {
+        getLog().logdouble(data, name, after);
     }
 
-    public static void logchar(char data, String name) {
-        getLog().logchar(data, name);
+    public static void logchar(char data, String name, boolean after) {
+        getLog().logchar(data, name, after);
     }
 
-    public static void logString(String data, String name) {
-        getLog().logString(data, name);
+    public static void logString(String data, String name, boolean after) {
+        getLog().logString(data, name, after);
     }
 
-    public static void logboolean(boolean data, String name) {
-        getLog().logboolean(data, name);
+    public static void logboolean(boolean data, String name, boolean after) {
+        getLog().logboolean(data, name, after);
     }
 
-    public static void logArraybyte(byte[] data, String name) {
-        getLog().logArraybyte(data, name);
+    public static void logArraybyte(byte[] data, String name, boolean after) {
+        getLog().logArraybyte(data, name, after);
     }
 
-    public static void logArrayshort(short[] data, String name) {
-        getLog().logArrayshort(data, name);
+    public static void logArrayshort(short[] data, String name, boolean after) {
+        getLog().logArrayshort(data, name, after);
     }
 
-    public static void logArrayint(int[] data, String name) {
-        getLog().logArrayint(data, name);
+    public static void logArrayint(int[] data, String name, boolean after) {
+        getLog().logArrayint(data, name, after);
     }
 
-    public static void logArraylong(long[] data, String name) {
-        getLog().logArraylong(data, name);
+    public static void logArraylong(long[] data, String name, boolean after) {
+        getLog().logArraylong(data, name, after);
     }
 
-    public static void logArrayfloat(float[] data, String name) {
-        getLog().logArrayfloat(data, name);
+    public static void logArrayfloat(float[] data, String name, boolean after) {
+        getLog().logArrayfloat(data, name, after);
     }
 
-    public static void logArraydouble(double[] data, String name) {
-        getLog().logArraydouble(data, name);
+    public static void logArraydouble(double[] data, String name, boolean after) {
+        getLog().logArraydouble(data, name, after);
     }
 
-    public static void logArraychar(char[] data, String name) {
-        getLog().logArraychar(data, name);
+    public static void logArraychar(char[] data, String name, boolean after) {
+        getLog().logArraychar(data, name, after);
     }
 
-    public static void logArrayString(String[] data, String name) {
-        getLog().logArrayString(data, name);
+    public static void logArrayString(String[] data, String name, boolean after) {
+        getLog().logArrayString(data, name, after);
     }
 
-    public static void logArrayboolean(boolean[] data, String name) {
-        getLog().logArrayboolean(data, name);
+    public static void logArrayboolean(boolean[] data, String name, boolean after) {
+        getLog().logArrayboolean(data, name, after);
     }
 
     public static void close() {

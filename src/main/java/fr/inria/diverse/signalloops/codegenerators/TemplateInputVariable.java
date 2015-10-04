@@ -9,6 +9,7 @@ public class TemplateInputVariable {
     String loadMethodName;
     String variableType;
     private boolean initialized;
+    private boolean isArray;
 
     public void setVariableName(String variableName) {
         this.variableName = variableName;
@@ -40,5 +41,17 @@ public class TemplateInputVariable {
 
     public boolean getInitialized() {
         return initialized;
+    }
+
+    public void setIsArray(boolean isArray) {
+        this.isArray = isArray;
+    }
+
+    public boolean getIsArray() {
+        return isArray;
+    }
+
+    public void setArray(boolean isArray) {
+        this.isArray = isArray;
     }
 }

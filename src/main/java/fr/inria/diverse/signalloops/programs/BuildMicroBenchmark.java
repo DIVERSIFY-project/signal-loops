@@ -52,8 +52,10 @@ public class BuildMicroBenchmark {
         Configuration confSrc = new Configuration(prjSrc);
         confSrc.addDetector(inputs);
         //confSrc.addDetector(new MethodDetect());
-        String injection = Log.class.getCanonicalName() + ".log%type%(%var%, %name%);\n";
+        String injection = Log.class.getCanonicalName() + ".log%type%(%var%, \"%name%\", false);\n";
         confSrc.addInjector(LoopInputsDetector.INPUTS, new GenericInjector(injection));
+        injection = Log.class.getCanonicalName() + ".logAfter%type%(%var%, \"%name%_after\", true);\n";
+        confSrc.addInjector(LoopInputsDetector.AFTER_INPUTS, new GenericInjector(injection));
         injection = Log.class.getCanonicalName() + ".close();\n";
         confSrc.addInjector(LoopInputsDetector.END_INPUTS, new GenericInjector(injection));
 

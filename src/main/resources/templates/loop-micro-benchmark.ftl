@@ -9,8 +9,8 @@ import java.io.DataInputStream;
 @State(Scope.Thread)
 public class ${class_name}_${degraded_type} {
 
-    static final String INPUT_ROOT_FOLDER = "${input_root_folder_path}";
-    static final String INPUT_DATA_FILE = "${input_data_file_path}";
+    static final String DATA_ROOT_FOLDER = "${data_root_folder_path}";
+    static final String DATA_FILE = "${data_file_path}";
 
 <#list input_vars as input_var>
     public ${input_var.variableType} ${input_var.variableName} ;
@@ -19,7 +19,7 @@ public class ${class_name}_${degraded_type} {
     @Setup(Level.Invocation)
     public void setup() {
         try {
-            DataInputStream s = Loader.getStream(INPUT_ROOT_FOLDER, INPUT_DATA_FILE);
+            DataInputStream s = Loader.getStream(DATA_ROOT_FOLDER, DATA_FILE);
 
     <#list input_vars as input_var>
         <#if input_var.initialized == true >
