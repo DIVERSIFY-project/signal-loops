@@ -120,7 +120,7 @@ public class LoopInputsDetector extends Detector<CtLoop> {
         //Build the injection of each variable
         //Add to the injection only initialized and Non-local variable
         for (CtVariableAccess a : access) {
-            if ( inputs.getInitialized().contains(a) && isLocalVariable(a, localVars)) {
+            if (inputs.getInitialized().contains(a) && isLocalVariable(a, localVars)) {
                 inputs.getInitialized().remove(a);
             }
         }
@@ -138,7 +138,7 @@ public class LoopInputsDetector extends Detector<CtLoop> {
 
         //
         StringBuilder sb = new StringBuilder(buildSnippet(input, inputInjectors));
-        sb.append(buildSnippet(input, afterInputInjectors));
+        //
         //Build the injection at the end
         String snippet = getSnippet(endInjectors, loop, data);
         if (snippet != null && !snippet.isEmpty()) sb.append(snippet);
@@ -152,6 +152,9 @@ public class LoopInputsDetector extends Detector<CtLoop> {
         int indexSp = sp.getSourceStart();
         CompilationUnit cu = sp.getCompilationUnit();
         cu.addSourceCodeFragment(new SourceCodeFragment(indexSp, sb.toString(), 0));
+
+        indexSp = sp.getSourceEnd() + 1;
+        cu.addSourceCodeFragment(new SourceCodeFragment(indexSp, sb.toString().replace(", false);\n", ", true);\n"), 0));
     }
 
     /**
@@ -162,15 +165,17 @@ public class LoopInputsDetector extends Detector<CtLoop> {
     private String buildSnippet(SignalLoop inputs, Collection<Injector> injectors) {
         StringBuilder sb = new StringBuilder();
         for (CtVariableAccess a : inputs.getAccesses()) {
-            data = new DetectionData();
-            data.getParams().put("var", getCompilableName(a));
-            data.getParams().put("name", getSignatureOfVar(a, inputs.getLoop()));
-            //if ( a.getVariable().getType().is )
-            if (a.getVariable().getType() instanceof CtArrayTypeReference) {
-                CtArrayTypeReference ref = (CtArrayTypeReference) a.getVariable().getType();
-                data.getParams().put("type", "Array" + ref.getComponentType().toString());
-            } else data.getParams().put("type", a.getVariable().getType().toString());
-            sb.append(getSnippet(injectors, inputs.getLoop(), data));
+            if (isInitialized(a, inputs.getLoop())) {
+                data = new DetectionData();
+                data.getParams().put("var", getCompilableName(a));
+                data.getParams().put("name", getSignatureOfVar(a, inputs.getLoop()));
+                //if ( a.getVariable().getType().is )
+                if (a.getVariable().getType() instanceof CtArrayTypeReference) {
+                    CtArrayTypeReference ref = (CtArrayTypeReference) a.getVariable().getType();
+                    data.getParams().put("type", "Array" + ref.getComponentType().toString());
+                } else data.getParams().put("type", a.getVariable().getType().toString());
+                sb.append(getSnippet(injectors, inputs.getLoop(), data));
+            }
         }
         return sb.toString();
     }
@@ -260,16 +265,22 @@ public class LoopInputsDetector extends Detector<CtLoop> {
     }
 
     /**
-     * Indicate if a variable access is initialized
+     * Indicate if a variable access is initialized before the loop
      *
      * @param a
      * @param loop
      * @return
      */
     private boolean isInitialized(CtVariableAccess a, CtLoop loop) {
+        //Discard all variables being declared inside the loop expression
+        List<CtVariable> vs = loop.getElements(new TypeFilter<CtVariable>(CtVariable.class));
+        if (vs.contains(a.getVariable().getDeclaration())) return false;
+
         if ((a.getVariable().getDeclaration() != null &&
                 a.getVariable().getDeclaration().getDefaultExpression() != null)
                 || !(a.getVariable() instanceof CtLocalVariableReference)) return true;
+
+        //Discard all variables being assigned after the loop
         CtMethod m = a.getParent(CtMethod.class);
         if (m == null) return false;
         List<CtAssignment> assignments = m.getElements(new TypeFilter<CtAssignment>(CtAssignment.class));
@@ -333,6 +344,7 @@ public class LoopInputsDetector extends Detector<CtLoop> {
     @Override
     public void collectInjectors(AbstractMap<String, Collection<Injector>> injectors) {
         inputInjectors = injectors.containsKey(INPUTS) ? injectors.get(INPUTS) : new ArrayList<Injector>();
+        afterInputInjectors = injectors.containsKey(AFTER_INPUTS) ? injectors.get(AFTER_INPUTS) : new ArrayList<Injector>();
         endInjectors = injectors.containsKey(END_INPUTS) ? injectors.get(END_INPUTS) : new ArrayList<Injector>();
     }
 
