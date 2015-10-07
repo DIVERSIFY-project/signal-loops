@@ -295,7 +295,7 @@ public class LoopPerforation {
                 LoopPerforation.class.getResource("/loop_perforation/" + args[0]).toURI().getPath()));
 
         //Boolean loopFound =
-                instrumentAndRun(-1, properties, DONT_MEASURE_ACCURACY, MEASURE_TIME, PERFORATE, false); // Measure time
+                instrumentAndRun(-1, properties, DONT_MEASURE_ACCURACY, MEASURE_TIME, PERFORATE, true); // Measure time
         /*
         int i = 0;
         while (loopFound) {
