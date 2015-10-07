@@ -11,14 +11,13 @@ import spoon.reflect.visitor.CtVisitor;
 import spoon.reflect.visitor.filter.TypeFilter;
 
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
  * Builds the Def - use graph to feed the cycle detector
- *
+ * <p/>
  * Created by marodrig on 07/10/2015.
  */
 public class DefChainCycleDetectorVisitor implements CtVisitor {
@@ -33,6 +32,12 @@ public class DefChainCycleDetectorVisitor implements CtVisitor {
      * Set of variables local to statement
      */
     Set<CtVariableReference> localToStatement = new HashSet<CtVariableReference>();
+
+    public CycleDetector<CtVariableReference, DefaultEdge> buildDetector(CtBlock loopBody, Set<CtVariableReference> localToLoop) {
+        this.localToStatement = localToLoop;
+        loopBody.accept(this);
+        return new CycleDetector<CtVariableReference, DefaultEdge>(result);
+    }
 
 
     public static class DefChainGraph extends DefaultDirectedGraph<CtVariableReference, DefaultEdge> {
@@ -105,7 +110,7 @@ public class DefChainCycleDetectorVisitor implements CtVisitor {
     @Override
     public <T, A extends T> void visitCtAssignment(CtAssignment<T, A> assignement) {
         //Obtain all variable access in the assignment expression
-        List<CtVariableAccess> left = accessOfExpression(assignement.getAssigned());
+        List<CtVariableAccess> left = accessOfLeftExpression(assignement.getAssigned());
         List<CtVariableAccess> right = accessOfExpression(assignement.getAssignment());
         //Create a graph such as there is an edge when a variable depends of another in some point
         //in the code.
@@ -113,9 +118,34 @@ public class DefChainCycleDetectorVisitor implements CtVisitor {
             if (!result.containsVertex(l.getVariable())) result.addVertex(l.getVariable());
             for (CtVariableAccess r : right) {
                 if (!result.containsVertex(r.getVariable())) result.addVertex(r.getVariable());
-                result.addEdge(l.getVariable(), r.getVariable());
+                if (!result.containsEdge(l.getVariable(), r.getVariable()))
+                    result.addEdge(l.getVariable(), r.getVariable());
+            }
+
+            if ( l.getVariable() instanceof CtLocalVariable ) visitCtLocalVariable((CtLocalVariable)l.getVariable());
+        }
+
+    }
+
+    @Override
+    public <T> void visitCtLocalVariable(CtLocalVariable<T> localVariable) {
+//Mark all variables local to the loop
+        if ( !localToStatement.contains(localVariable) ) localToStatement.add(localVariable.getReference());
+        if (!result.containsVertex(localVariable.getReference()) ) result.addVertex(localVariable.getReference());
+
+        if (localVariable.getDefaultExpression() != null) {
+            List<CtVariableAccess> right = accessOfExpression(localVariable.getDefaultExpression());
+            for (CtVariableAccess r : right) {
+                if (!result.containsVertex(r.getVariable())) result.addVertex(r.getVariable());
+                if (!result.containsEdge(localVariable.getReference(), r.getVariable()))
+                    result.addEdge(localVariable.getReference(), r.getVariable());
             }
         }
+    }
+
+    private <T> List<CtVariableAccess> accessOfLeftExpression(CtExpression<T> assigned) {
+        if (assigned instanceof CtArrayAccess) return accessOfLeftExpression(((CtArrayAccess) assigned).getTarget());
+        return accessOfExpression(assigned);
     }
 
     @Override
@@ -152,7 +182,7 @@ public class DefChainCycleDetectorVisitor implements CtVisitor {
     public <T> void visitCtConditional(CtConditional<T> conditional) {
         conditional.getCondition().accept(this);
         conditional.getThenExpression().accept(this);
-        conditional.getElseExpression().accept(this);
+        if (conditional.getElseExpression() != null) conditional.getElseExpression().accept(this);
     }
 
     @Override
@@ -167,8 +197,8 @@ public class DefChainCycleDetectorVisitor implements CtVisitor {
 
     @Override
     public void visitCtDo(CtDo doLoop) {
-        doLoop.getBody().accept(this);
         doLoop.getLoopingExpression().accept(this);
+        doLoop.getBody().accept(this);
     }
 
     @Override
@@ -219,7 +249,7 @@ public class DefChainCycleDetectorVisitor implements CtVisitor {
     public void visitCtIf(CtIf ifElement) {
         ifElement.getCondition().accept(this);
         ifElement.getThenStatement().accept(this);
-        ifElement.getElseStatement().accept(this);
+        if (ifElement.getElseStatement() != null) ifElement.getElseStatement().accept(this);
     }
 
     @Override
@@ -237,20 +267,7 @@ public class DefChainCycleDetectorVisitor implements CtVisitor {
 
     }
 
-    @Override
-    public <T> void visitCtLocalVariable(CtLocalVariable<T> localVariable) {
-//Mark all variables local to the loop
-        localToStatement.add(localVariable.getReference());
-        result.addVertex(localVariable.getReference());
 
-        if (localVariable.getDefaultExpression() != null) {
-            List<CtVariableAccess> right = accessOfExpression(localVariable.getDefaultExpression());
-            for (CtVariableAccess r : right) {
-                if (!result.containsVertex(r.getVariable())) result.addVertex(r.getVariable());
-                result.addEdge(localVariable.getReference(), r.getVariable());
-            }
-        }
-    }
 
     @Override
     public <T> void visitCtLocalVariableReference(CtLocalVariableReference<T> reference) {
@@ -349,7 +366,6 @@ public class DefChainCycleDetectorVisitor implements CtVisitor {
     public <T> void visitCtUnaryOperator(CtUnaryOperator<T> operator) {
 
     }
-
 
 
     @Override

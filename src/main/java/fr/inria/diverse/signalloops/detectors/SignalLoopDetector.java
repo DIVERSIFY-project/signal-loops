@@ -1,6 +1,6 @@
 package fr.inria.diverse.signalloops.detectors;
 
-import fr.inria.diverse.signalloops.detectors.logic.DefUseChainCycleDetectorFactory;
+import fr.inria.diverse.signalloops.detectors.logic.DefChainCycleDetectorVisitor;
 import fr.inria.diverse.signalloops.detectors.logic.StatementCounterVisitor;
 import fr.inria.diverse.signalloops.model.SignalLoop;
 import fr.inria.diversify.syringe.detectors.LoopDetect;
@@ -291,7 +291,7 @@ public class SignalLoopDetector extends LoopDetect {
             signalElementsDetected++;
 
             CycleDetector<CtVariableReference, DefaultEdge> cycleDetector =
-                    new DefUseChainCycleDetectorFactory().buildDetector(loopBody, localToLoop);
+                    new DefChainCycleDetectorVisitor().buildDetector(loopBody, localToLoop);
 
             //Inmutable detector BEGIN
             int up = signalStmntIndex - 1; //Find the Upper avoidable frontier of the loop
@@ -436,13 +436,18 @@ public class SignalLoopDetector extends LoopDetect {
      */
     private boolean recursive(CtStatement statement, Set<CtVariableReference> localToLoop,
                               CycleDetector<CtVariableReference, DefaultEdge> cycleDetector) {
+
         if (statement instanceof CtAssignment) {
             CtAssignment e = (CtAssignment) statement;
             List<CtVariableAccess> left = accessOfExpression(e.getAssigned());
             for (CtVariableAccess access : left) {
                 CtVariableReference ref = access.getVariable();
-                if (!localToLoop.contains(ref) && cycleDetector.detectCyclesContainingVertex(ref)) {
-                    return true;
+                try {
+                    if (!localToLoop.contains(ref) && cycleDetector.detectCyclesContainingVertex(ref)) {
+                        return true;
+                    }
+                }catch (IllegalArgumentException ex) {
+                    continue;
                 }
             }
         }
