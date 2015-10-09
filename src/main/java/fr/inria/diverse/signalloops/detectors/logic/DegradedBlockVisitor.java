@@ -1,285 +1,229 @@
 package fr.inria.diverse.signalloops.detectors.logic;
 
+import org.jgrapht.alg.CycleDetector;
+import org.jgrapht.graph.DefaultEdge;
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;
 import spoon.reflect.reference.*;
-import spoon.reflect.visitor.CtVisitor;
+import spoon.reflect.visitor.filter.TypeFilter;
+import spoon.support.reflect.code.CtBlockImpl;
+import spoon.support.reflect.code.CtCodeSnippetStatementImpl;
 
-import java.lang.annotation.Annotation;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Creates a new block by visiting an old one maintaining only the immutable statements
- *
+ * <p/>
  * Created by marodrig on 07/10/2015.
  */
-public class DegradedBlockVisitor implements CtVisitor {
-    @Override
-    public <A extends Annotation> void visitCtAnnotation(CtAnnotation<A> annotation) {
+public class DegradedBlockVisitor extends SignalLoopVisitors {
 
+    private static enum Mutability {IMMUTABLE, REPLACEABLE, ERASABLE}
+
+    private CycleDetector<CtVariableReference, DefaultEdge> cycleDetector;
+
+    private Set<CtVariableReference> localVariables;
+
+    private boolean isEmpty(CtElement statement) {
+        boolean result = statement instanceof CtCodeSnippetStatement;
+        result |= (statement instanceof CtBlock) && ((CtBlock) statement).getStatements().size() == 0;
+        return result;
     }
 
-    @Override
-    public <T> void visitCtCodeSnippetExpression(CtCodeSnippetExpression<T> expression) {
-
+    /**
+     * Indicates if the element contains unary operators acting on variables non-local to itself
+     *
+     * @param element Element to inspect
+     * @return True if contains
+     */
+    private boolean containsNonLocalUnaryOperators(CtElement element) {
+        //Handling unary operators
+        for (CtUnaryOperator op :
+                element.getElements(new TypeFilter<CtUnaryOperator>(CtUnaryOperator.class))) {
+            for (CtVariableAccess a : accessOfExpression(op)) {
+                //Add cyclic dependencies to external variables
+                if (!localVariables.contains(a.getVariable())) return true;
+            }
+        }
+        return false;
     }
 
-    @Override
-    public void visitCtCodeSnippetStatement(CtCodeSnippetStatement statement) {
-
+    /**
+     * Indicates that contains operation assignment over variables non local to the element
+     *
+     * @param element
+     * @return
+     */
+    private boolean containNonLocalOperatorAssignment(CtElement element) {
+        //Handling operators assignment
+        for (CtOperatorAssignment op :
+                element.getElements(new TypeFilter<CtOperatorAssignment>(CtOperatorAssignment.class))) {
+            for (CtVariableAccess a : accessOfExpression(op.getAssigned())) {
+                //Add cyclic dependencies
+                if (!localVariables.contains(a.getVariable())) return true;
+            }
+        }
+        return false;
     }
 
-    @Override
-    public <A extends Annotation> void visitCtAnnotationType(CtAnnotationType<A> annotationType) {
 
+    /**
+     * Replaces the element by an statement list containing all unary operators in the element
+     *
+     * @param element
+     */
+    private void replaceByUnaryBlock(CtElement element) {
+        CtBlock<CtUnaryOperator> opBlock = new CtBlockImpl<CtUnaryOperator>();
+        for (CtUnaryOperator s : element.getElements(new TypeFilter<CtUnaryOperator>(CtUnaryOperator.class)))
+            if (s.getKind().compareTo(UnaryOperatorKind.POSTDEC) >= 0)
+                opBlock.addStatement(s);
+        element.replace(opBlock);
     }
 
-    @Override
-    public void visitCtAnonymousExecutable(CtAnonymousExecutable anonymousExec) {
-
+    /**
+     * Indicate if the statement contains a mutable expression
+     * <p/>
+     * A mutability expression is an expression that assigns value to a variable in the left side
+     * using that variable also in the right side, like this:
+     * <p/>
+     * a = a * b
+     * <p/>
+     * or like this:
+     * c = a * 2
+     * a = c + b
+     * <p/>
+     * <p/>
+     * Also, all unary operators and are mutable:
+     * a--;
+     * a++;
+     *
+     * @param statement Statement to check whether is a mutability expression
+     * @return True if it is a mutability expression
+     */
+    private Mutability mutability(CtElement statement) {
+        Mutability result = Mutability.ERASABLE;
+        if (statement instanceof CtAssignment) {
+            CtAssignment e = (CtAssignment) statement;
+            List<CtVariableAccess> left = accessOfLeftExpression(e.getAssigned());
+            for (CtVariableAccess access : left) {
+                CtVariableReference ref = access.getVariable();
+                try {
+                    if (!localVariables.contains(ref) && cycleDetector.detectCyclesContainingVertex(ref)) {
+                        result = Mutability.IMMUTABLE;
+                    }
+                } catch (IllegalArgumentException ex) {
+                    continue;
+                }
+            }
+        }
+        if (result == Mutability.ERASABLE) {
+            if (containNonLocalOperatorAssignment(statement)) return Mutability.IMMUTABLE;
+            else if (containsNonLocalUnaryOperators(statement)) return Mutability.REPLACEABLE;
+        }
+        return Mutability.ERASABLE;
     }
 
-    @Override
-    public <T, E extends CtExpression<?>> void visitCtArrayAccess(CtArrayAccess<T, E> arrayAccess) {
-
+    private void remove(CtStatement statement) {
+        if (statement.getParent() instanceof CtBlock) {
+            ((CtBlock) statement.getParent()).removeStatement(statement);
+        } else {
+            CtCodeSnippetStatementImpl comment = new CtCodeSnippetStatementImpl();
+            comment.setValue("/*REMOVED*/");
+            statement.replace(comment);
+        }
     }
 
-    @Override
-    public <T> void visitCtArrayTypeReference(CtArrayTypeReference<T> reference) {
-
-    }
-
-    @Override
-    public <T> void visitCtAssert(CtAssert<T> asserted) {
+    /**
+     * Performs the default action over an statement
+     *
+     * @param e
+     */
+    private void defaultAction(CtStatement e) {
+        if (mutability(e) == Mutability.ERASABLE) remove(e);
+        if (mutability(e) == Mutability.REPLACEABLE) replaceByUnaryBlock(e);
 
     }
 
     @Override
     public <T, A extends T> void visitCtAssignment(CtAssignment<T, A> assignement) {
-
-    }
-
-    @Override
-    public <T> void visitCtBinaryOperator(CtBinaryOperator<T> operator) {
-
+        defaultAction(assignement);
     }
 
     @Override
     public <R> void visitCtBlock(CtBlock<R> block) {
-
+        int i = 0;
+        while (i < block.getStatements().size()) {
+            int size = block.getStatements().size();
+            CtStatement s = block.getStatement(i);
+            s.accept(this);
+            if (block.getStatements().size() >= size) i++;
+        }
     }
 
-    @Override
-    public void visitCtBreak(CtBreak breakStatement) {
-
-    }
-
-    @Override
-    public <S> void visitCtCase(CtCase<S> caseStatement) {
-
-    }
-
-    @Override
-    public void visitCtCatch(CtCatch catchBlock) {
-
-    }
-
-    @Override
-    public <T> void visitCtClass(CtClass<T> ctClass) {
-
-    }
-
-    @Override
-    public <T> void visitCtConditional(CtConditional<T> conditional) {
-
-    }
-
-    @Override
-    public <T> void visitCtConstructor(CtConstructor<T> c) {
-
-    }
-
-    @Override
-    public void visitCtContinue(CtContinue continueStatement) {
-
-    }
 
     @Override
     public void visitCtDo(CtDo doLoop) {
-
+        doLoop.getBody().accept(this);
+        doLoop.getLoopingExpression().accept(this);
+        if (isEmpty(doLoop.getLoopingExpression()) && isEmpty(doLoop.getBody())) remove(doLoop);
     }
 
-    @Override
-    public <T extends Enum<?>> void visitCtEnum(CtEnum<T> ctEnum) {
-
-    }
 
     @Override
-    public <T> void visitCtExecutableReference(CtExecutableReference<T> reference) {
-
-    }
-
-    @Override
-    public <T> void visitCtField(CtField<T> f) {
-
-    }
-
-    @Override
-    public <T> void visitCtTargetedAccess(CtTargetedAccess<T> targetedAccess) {
-
-    }
-
-    @Override
-    public <T> void visitCtThisAccess(CtThisAccess<T> thisAccess) {
-
-    }
-
-    @Override
-    public <T> void visitCtFieldReference(CtFieldReference<T> reference) {
-
-    }
-
-    @Override
-    public void visitCtFor(CtFor forLoop) {
-
-    }
-
-    @Override
-    public void visitCtForEach(CtForEach foreach) {
-
+    public <T, A extends T> void visitCtOperatorAssignement(CtOperatorAssignment<T, A> assignment) {
+        for (CtVariableAccess a : accessOfExpression(assignment.getAssigned())) {
+            //Add cyclic dependencies
+            if (!localVariables.contains(a.getVariable())) {
+                remove(assignment);
+                return;
+            }
+        }
     }
 
     @Override
     public void visitCtIf(CtIf ifElement) {
+        //super.visitCtIf(ifElement);
 
-    }
+        Mutability condMut = mutability(ifElement.getCondition());
+        if (ifElement.getThenStatement() != null) ifElement.getThenStatement().accept(this);
+        if (ifElement.getElseStatement() != null) ifElement.getElseStatement().accept(this);
 
-    @Override
-    public <T> void visitCtInterface(CtInterface<T> intrface) {
+        if (condMut == Mutability.ERASABLE && isEmpty(ifElement.getThenStatement())) {
+            //if ( - ) {  } else {  } <- Remove the whole if
+            if (isEmpty(ifElement.getElseStatement())) remove(ifElement);
+                //if ( - ) {  } else { do }
+            else ifElement.getElseStatement().setParent(ifElement.getParent());
+        }
 
-    }
-
-    @Override
-    public <T> void visitCtInvocation(CtInvocation<T> invocation) {
-
-    }
-
-    @Override
-    public <T> void visitCtLiteral(CtLiteral<T> literal) {
-
-    }
-
-    @Override
-    public <T> void visitCtLocalVariable(CtLocalVariable<T> localVariable) {
-
-    }
-
-    @Override
-    public <T> void visitCtLocalVariableReference(CtLocalVariableReference<T> reference) {
-
-    }
-
-    @Override
-    public <T> void visitCtMethod(CtMethod<T> m) {
-
-    }
-
-    @Override
-    public <T> void visitCtNewArray(CtNewArray<T> newArray) {
-
-    }
-
-    @Override
-    public <T> void visitCtNewClass(CtNewClass<T> newClass) {
-
-    }
-
-    @Override
-    public <T, A extends T> void visitCtOperatorAssignement(CtOperatorAssignment<T, A> assignment) {
-
-    }
-
-    @Override
-    public void visitCtPackage(CtPackage ctPackage) {
-
-    }
-
-    @Override
-    public void visitCtPackageReference(CtPackageReference reference) {
-
-    }
-
-    @Override
-    public <T> void visitCtParameter(CtParameter<T> parameter) {
-
-    }
-
-    @Override
-    public <T> void visitCtParameterReference(CtParameterReference<T> reference) {
-
-    }
-
-    @Override
-    public <R> void visitCtReturn(CtReturn<R> returnStatement) {
-
-    }
-
-    @Override
-    public <R> void visitCtStatementList(CtStatementList<R> statements) {
-
-    }
-
-    @Override
-    public <S> void visitCtSwitch(CtSwitch<S> switchStatement) {
-
-    }
-
-    @Override
-    public void visitCtSynchronized(CtSynchronized synchro) {
-
-    }
-
-    @Override
-    public void visitCtThrow(CtThrow throwStatement) {
-
-    }
-
-    @Override
-    public void visitCtTry(CtTry tryBlock) {
-
-    }
-
-    @Override
-    public void visitCtTypeParameter(CtTypeParameter typeParameter) {
-
-    }
-
-    @Override
-    public void visitCtTypeParameterReference(CtTypeParameterReference ref) {
-
-    }
-
-    @Override
-    public <T> void visitCtTypeReference(CtTypeReference<T> reference) {
-
+        //if ( - ) {  } else { do }
     }
 
     @Override
     public <T> void visitCtUnaryOperator(CtUnaryOperator<T> operator) {
-
+        for (CtVariableAccess a : accessOfExpression(operator)) {
+            //Add cyclic dependencies to external variables
+            if (localVariables.contains(a.getVariable())) {
+                remove(operator);
+                return;
+            }
+        }
     }
 
-    @Override
-    public <T> void visitCtVariableAccess(CtVariableAccess<T> variableAccess) {
 
+    public void setCycleDetector(CycleDetector<CtVariableReference, DefaultEdge> cycleDetector) {
+        this.cycleDetector = cycleDetector;
     }
 
-    @Override
-    public void visitCtWhile(CtWhile whileLoop) {
-
+    public CycleDetector<CtVariableReference, DefaultEdge> getCycleDetector() {
+        return cycleDetector;
     }
 
-    @Override
-    public <T> void visitCtAnnotationFieldAccess(CtAnnotationFieldAccess<T> annotationFieldAccess) {
+    public void setLocalVariables(Set<CtVariableReference> localVariables) {
+        this.localVariables = localVariables;
+    }
 
+    public Set<CtVariableReference> getLocalVariables() {
+        return localVariables;
     }
 }

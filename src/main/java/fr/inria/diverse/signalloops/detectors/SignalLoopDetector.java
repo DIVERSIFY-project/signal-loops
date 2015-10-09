@@ -1,6 +1,7 @@
 package fr.inria.diverse.signalloops.detectors;
 
 import fr.inria.diverse.signalloops.detectors.logic.DefChainCycleDetectorVisitor;
+import fr.inria.diverse.signalloops.detectors.logic.DegradedBlockVisitor;
 import fr.inria.diverse.signalloops.detectors.logic.StatementCounterVisitor;
 import fr.inria.diverse.signalloops.model.SignalLoop;
 import fr.inria.diversify.syringe.detectors.LoopDetect;
@@ -18,6 +19,7 @@ import spoon.reflect.reference.CtArrayTypeReference;
 import spoon.reflect.reference.CtTypeReference;
 import spoon.reflect.reference.CtVariableReference;
 import spoon.reflect.visitor.filter.TypeFilter;
+import spoon.support.reflect.code.CtBlockImpl;
 
 import java.util.*;
 
@@ -129,6 +131,7 @@ public class SignalLoopDetector extends LoopDetect {
 
     /**
      * Indicates whether more signal loops remain to be found
+     *
      * @return True if more loops remains, false otherwise
      */
     public boolean getMoreLoopsRemain() {
@@ -140,8 +143,9 @@ public class SignalLoopDetector extends LoopDetect {
 
     /**
      * ID of the specific loop we want to find. -1 if none special loop is needed or if all are to be finded.
-     *
+     * <p/>
      * This is usefull to process one loop at a time
+     *
      * @param loopId
      */
     public void setLoopId(int loopId) {
@@ -154,6 +158,7 @@ public class SignalLoopDetector extends LoopDetect {
 
     /**
      * Number of signal loops detected
+     *
      * @return
      */
     public int getSignalElementsDetected() {
@@ -178,6 +183,7 @@ public class SignalLoopDetector extends LoopDetect {
 
     /**
      * Indicate whether the processor should prepare a microbenchmark when a signal loop is detected
+     *
      * @param prepareMicroBenchMark
      */
     public void setPrepareMicroBenchMark(boolean prepareMicroBenchMark) {
@@ -293,6 +299,23 @@ public class SignalLoopDetector extends LoopDetect {
             CycleDetector<CtVariableReference, DefaultEdge> cycleDetector =
                     new DefChainCycleDetectorVisitor().buildDetector(loopBody, localToLoop);
 
+            //Build a new degraded block
+            DegradedBlockVisitor degradeVisitor = new DegradedBlockVisitor();
+            degradeVisitor.setCycleDetector(cycleDetector);
+            degradeVisitor.setLocalVariables(localToLoop);
+            CtStatement clonedBody = loop.getFactory().Core().clone(loop.getBody());
+            clonedBody.setParent(loop);
+            try {
+                clonedBody.accept(degradeVisitor);
+            } catch (Exception e) {
+                log.error(e.getMessage());
+                log.error("Unable to process " + loop);
+                e.printStackTrace();
+                return;
+            }
+
+            //appendDegradedBlock(loop.getBody(), clonedBody);
+/*
             //Inmutable detector BEGIN
             int up = signalStmntIndex - 1; //Find the Upper avoidable frontier of the loop
             if (up > 0) {
@@ -310,37 +333,40 @@ public class SignalLoopDetector extends LoopDetect {
                 if (down > hi) down = hi;
             } else down = hi;
 
+
             StringBuilder recDown = new StringBuilder();
             for (int i = down + 1; i < loopBody.getStatements().size(); i++)
                 printStatement(loopBody.getStatement(i), recDown);
 
             //Calculate the approximate ratio of the loop
             ApproximatedRatio ratio = countStatements(loopBody, up, down);
-
+            */
             //INMUTABLE DETECTION END
 
             log.info("--------------------------------------");
             if (loopBody.getStatements().size() > 1) {
                 log.info("Index:       " + signalStmntIndex);
+                /*
                 log.info("Up   :       " + up);
                 log.info("Down :       " + down);
                 log.info("Total Stmnt : " + ratio.getTotalLines());
                 log.info("Kept  Stmnt : " + ratio.getFixedStmnt());
+                */
             } else {
                 log.info("Single line loop");
             }
             SignalLoop signalLoop = new SignalLoop();
             signalLoop.setId(getIdMap().get(getSignatureFromElement(loop)));
             signalLoop.setCode(ctFor.toString());
-            signalLoop.setTotalStmnt(ratio.getTotalLines());
-            signalLoop.setFixedStmnt(ratio.getFixedStmnt());
+            //signalLoop.setTotalStmnt(ratio.getTotalLines());
+            //signalLoop.setFixedStmnt(ratio.getFixedStmnt());
             signalLoop.setPosition(lastLoopPosition);
-            signalLoop.setUpFix(up);
-            signalLoop.setDownFix(down);
+            //signalLoop.setUpFix(up);
+            //signalLoop.setDownFix(down);
             signalLoop.setSignalLoop(true);
             signalLoop.setLoop(loop);
             signalLoop.setSignalArray(signalParams.access);
-            if ( prepareMicroBenchMark ) {
+            if (prepareMicroBenchMark) {
                 new LoopInputsDetector().prepareMicrobenchmarkData(signalLoop);
             }
 
@@ -349,8 +375,8 @@ public class SignalLoopDetector extends LoopDetect {
 
             data.getParams().put("index_expr", signalParams.arrayIndex);
             data.getParams().put("array", signalParams.arrayName);
-            data.getParams().put("recursive_up", recUp.toString());
-            data.getParams().put("recursive_down", recDown.toString());
+            data.getParams().put("recursive_up", prettyPrintBody(clonedBody));
+            data.getParams().put("recursive_down", "/*DOWN*/");
             data.getParams().put("loop_condition", getLoopExpression(loop).toString());
 
             StringBuilder sbUpdate = new StringBuilder();
@@ -369,9 +395,9 @@ public class SignalLoopDetector extends LoopDetect {
 
             //AFTER LOOP BLOCK
             sp = loopBody.getLastStatement().getPosition();
-            indexSp = sp.getSourceEnd() + 1;
+            indexSp = sp.getSourceEnd() + 2;
             snippet = getSnippet(endInjectors, loop, data);
-            if ( degrade ) cu.addSourceCodeFragment(new SourceCodeFragment(indexSp, snippet, 0));
+            if (degrade) cu.addSourceCodeFragment(new SourceCodeFragment(indexSp, snippet, 0));
 
             signalLoop.setDegradedSnippet(snippet);
 
@@ -379,7 +405,7 @@ public class SignalLoopDetector extends LoopDetect {
             //ARRAY ACCESS
             data.getParams().put("array_access", signalParams.access.toString());
             sp = loopBody.getStatement(signalParams.statementIndex).getPosition();
-            indexSp = sp.getSourceEnd() + 1;
+            indexSp = sp.getSourceEnd();
             snippet = getSnippet(accessInjectors, loop, data);
             cu.addSourceCodeFragment(new SourceCodeFragment(indexSp, snippet, 0));
 
@@ -401,6 +427,45 @@ public class SignalLoopDetector extends LoopDetect {
             //Update if we have updated the ids
             updateIdFound(signature);
         }
+    }
+
+
+    private String prettyPrintBody(CtStatement clonedBody) {
+        String result = "";
+        if ( clonedBody instanceof CtBlock ) {
+            CtBlock block = (CtBlock) clonedBody;
+            for (int i = 0; i < block.getStatements().size(); i++ ) {
+                if ( block.getStatement(i) instanceof CtBlock ) result += prettyPrintBody(block.getStatement(i));
+                else result += block.getStatement(i).toString() + ";\n";
+            }
+        } else result = clonedBody.toString();
+        return result;
+    }
+
+    /**
+     * Appends the cloned body to the body
+     *
+     * @param body
+     * @param clonedBody
+     */
+    private void appendDegradedBlock(CtStatement body, CtStatement clonedBody) {
+
+        CtBlock destBlock;
+        if (body instanceof CtBlock) {
+            destBlock = (CtBlock) body;
+        } else {
+            destBlock = new CtBlockImpl();
+            destBlock.addStatement(body);
+            destBlock.setParent(body.getParent());
+            body.setParent(destBlock);
+        }
+
+        if (clonedBody instanceof CtBlock) {
+            CtBlock srcBlock = (CtBlock) clonedBody;
+            for (int i = 0; i < srcBlock.getStatements().size(); i++) {
+                destBlock.addStatement(srcBlock.getStatement(i));
+            }
+        } else destBlock.addStatement(clonedBody);
     }
 
 
@@ -426,8 +491,13 @@ public class SignalLoopDetector extends LoopDetect {
      * using that variable also in the right side, like this:
      * <p/>
      * a = a * b
+     *
+     * or like this:
+     * c = a * 2
+     * a = c + b
+     *
      * <p/>
-     * Also, all unary operators are recursive:
+     * Also, all unary operators and are recursive:
      * a--;
      * a++;
      *
@@ -446,7 +516,7 @@ public class SignalLoopDetector extends LoopDetect {
                     if (!localToLoop.contains(ref) && cycleDetector.detectCyclesContainingVertex(ref)) {
                         return true;
                     }
-                }catch (IllegalArgumentException ex) {
+                } catch (IllegalArgumentException ex) {
                     continue;
                 }
             }
@@ -456,7 +526,7 @@ public class SignalLoopDetector extends LoopDetect {
         for (CtUnaryOperator op :
                 statement.getElements(new TypeFilter<CtUnaryOperator>(CtUnaryOperator.class))) {
             for (CtVariableAccess a : accessOfExpression(op)) {
-                //Add cyclic dependencies
+                //Add cyclic dependencies to external variables
                 if (!localToLoop.contains(a.getVariable())) return true;
             }
         }

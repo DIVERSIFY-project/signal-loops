@@ -101,7 +101,7 @@ public class LoopPerforation {
             if (registerOutput) {
                 injection += ";" + Log.class.getCanonicalName() + ".arrayAccess(%elementId%, %array%[%index_expr%]); ";
             }
-            injection += "%recursive_down%}";
+            injection += "%recursive_down% }/*injection*/";
             confSrc.addInjector(SignalLoopDetector.END_KEY, new GenericInjector(injection));
         }
         return confSrc;
@@ -295,7 +295,7 @@ public class LoopPerforation {
                 LoopPerforation.class.getResource("/loop_perforation/" + args[0]).toURI().getPath()));
 
         //Boolean loopFound =
-                instrumentAndRun(-1, properties, DONT_MEASURE_ACCURACY, MEASURE_TIME, PERFORATE, true); // Measure time
+                instrumentAndRun(-1, properties, DONT_MEASURE_ACCURACY, MEASURE_TIME, PERFORATE, false); // Measure time
         /*
         int i = 0;
         while (loopFound) {
