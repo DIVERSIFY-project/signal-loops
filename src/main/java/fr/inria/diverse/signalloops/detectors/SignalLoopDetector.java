@@ -1,7 +1,7 @@
 package fr.inria.diverse.signalloops.detectors;
 
-import fr.inria.diverse.signalloops.detectors.logic.DefChainCycleDetectorVisitor;
-import fr.inria.diverse.signalloops.detectors.logic.DegradedBlockVisitor;
+import fr.inria.diverse.signalloops.detectors.logic.MutableEvaluatorVisitor;
+import fr.inria.diverse.signalloops.detectors.logic.MutatorVisitor;
 import fr.inria.diverse.signalloops.detectors.logic.StatementCounterVisitor;
 import fr.inria.diverse.signalloops.model.SignalLoop;
 import fr.inria.diversify.syringe.detectors.LoopDetect;
@@ -297,51 +297,25 @@ public class SignalLoopDetector extends LoopDetect {
             signalElementsDetected++;
 
             CycleDetector<CtVariableReference, DefaultEdge> cycleDetector =
-                    new DefChainCycleDetectorVisitor().buildDetector(loopBody, localToLoop);
+                    new MutableEvaluatorVisitor().buildDetector(loopBody, localToLoop);
 
             //Build a new degraded block
-            DegradedBlockVisitor degradeVisitor = new DegradedBlockVisitor();
+            MutatorVisitor degradeVisitor = new MutatorVisitor();
             degradeVisitor.setCycleDetector(cycleDetector);
-            degradeVisitor.setLocalVariables(localToLoop);
+            degradeVisitor.setDeclaredInsideBlock(localToLoop);
             CtStatement clonedBody = loop.getFactory().Core().clone(loop.getBody());
             clonedBody.setParent(loop);
+            String degradedPrint = "";
             try {
                 clonedBody.accept(degradeVisitor);
+                degradedPrint = degradeVisitor.prettyPrintBody(clonedBody);
+                log.info("Degraded body: " + degradedPrint);
             } catch (Exception e) {
                 log.error(e.getMessage());
                 log.error("Unable to process " + loop);
                 e.printStackTrace();
                 return;
             }
-
-            //appendDegradedBlock(loop.getBody(), clonedBody);
-/*
-            //Inmutable detector BEGIN
-            int up = signalStmntIndex - 1; //Find the Upper avoidable frontier of the loop
-            if (up > 0) {
-                while (up >= 0 && !recursive(loopBody.getStatement(up), localToLoop, cycleDetector)) up--;
-            } else up = -1;
-
-            //Non avoidable statements before the array assign
-            StringBuilder recUp = new StringBuilder();
-            for (int i = 0; i <= up; i++) printStatement(loopBody.getStatement(i), recUp);
-
-            int hi = loopBody.getStatements().size() - 1;
-            int down = signalStmntIndex + 1; //Find the Lower avoidable frontier of the loop
-            if (down < hi) {
-                while (down <= hi && !recursive(loopBody.getStatement(down), localToLoop, cycleDetector)) down++;
-                if (down > hi) down = hi;
-            } else down = hi;
-
-
-            StringBuilder recDown = new StringBuilder();
-            for (int i = down + 1; i < loopBody.getStatements().size(); i++)
-                printStatement(loopBody.getStatement(i), recDown);
-
-            //Calculate the approximate ratio of the loop
-            ApproximatedRatio ratio = countStatements(loopBody, up, down);
-            */
-            //INMUTABLE DETECTION END
 
             log.info("--------------------------------------");
             if (loopBody.getStatements().size() > 1) {
@@ -375,7 +349,7 @@ public class SignalLoopDetector extends LoopDetect {
 
             data.getParams().put("index_expr", signalParams.arrayIndex);
             data.getParams().put("array", signalParams.arrayName);
-            data.getParams().put("recursive_up", prettyPrintBody(clonedBody));
+            data.getParams().put("recursive_up", degradedPrint);
             data.getParams().put("recursive_down", "/*DOWN*/");
             data.getParams().put("loop_condition", getLoopExpression(loop).toString());
 
@@ -429,18 +403,6 @@ public class SignalLoopDetector extends LoopDetect {
         }
     }
 
-
-    private String prettyPrintBody(CtStatement clonedBody) {
-        String result = "";
-        if ( clonedBody instanceof CtBlock ) {
-            CtBlock block = (CtBlock) clonedBody;
-            for (int i = 0; i < block.getStatements().size(); i++ ) {
-                if ( block.getStatement(i) instanceof CtBlock ) result += prettyPrintBody(block.getStatement(i));
-                else result += block.getStatement(i).toString() + ";\n";
-            }
-        } else result = clonedBody.toString();
-        return result;
-    }
 
     /**
      * Appends the cloned body to the body

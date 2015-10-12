@@ -10,17 +10,26 @@ import spoon.reflect.reference.*;
 import spoon.reflect.visitor.filter.TypeFilter;
 
 import java.lang.annotation.Annotation;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
- * Builds the Def - use graph to feed the cycle detector
+ * This visitor determines what statement can be degraded (i.e. transformed into something else or removed)
+ *
  * <p/>
  * Created by marodrig on 07/10/2015.
  */
-public class DefChainCycleDetectorVisitor extends SignalLoopVisitors {
+public class MutableEvaluatorVisitor extends SignalLoopVisitors {
 
+    public static enum Mutability {IMMUTABLE, REPLACEABLE, ERASABLE}
+
+    private HashMap<CtStatement, Mutability> mutability;
+
+    public HashMap<CtStatement, Mutability> getMutability() {
+        return mutability;
+    }
 
     /**
      * Def-Chain resulting of the visits
@@ -33,8 +42,12 @@ public class DefChainCycleDetectorVisitor extends SignalLoopVisitors {
     Set<CtVariableReference> localToStatement = new HashSet<CtVariableReference>();
 
     public CycleDetector<CtVariableReference, DefaultEdge> buildDetector(CtBlock loopBody, Set<CtVariableReference> localToLoop) {
+        mutability = new HashMap<CtStatement, Mutability>();
+
         this.localToStatement = localToLoop;
+
         loopBody.accept(this);
+
         return new CycleDetector<CtVariableReference, DefaultEdge>(result);
     }
 
@@ -75,13 +88,36 @@ public class DefChainCycleDetectorVisitor extends SignalLoopVisitors {
             if (!result.containsVertex(l.getVariable())) result.addVertex(l.getVariable());
             for (CtVariableAccess r : right) {
                 if (!result.containsVertex(r.getVariable())) result.addVertex(r.getVariable());
-                if (!result.containsEdge(l.getVariable(), r.getVariable()))
+                if ( !result.containsEdge(l.getVariable(), r.getVariable()))
+
+                    //Avoid special case of local variables pointing themselves like in
+                    //int a = a + 2
+                    if ( l.getVariable().equals(r.getVariable()) &&
+                            localToStatement.contains(l.getVariable()) ) continue;
+
                     result.addEdge(l.getVariable(), r.getVariable());
             }
 
             if (l.getVariable() instanceof CtLocalVariable) visitCtLocalVariable((CtLocalVariable) l.getVariable());
         }
 
+    }
+
+    /**
+     * Indicates if an edge exists already between a local var and a variable access
+     * @return
+     */
+    private boolean existEdge(CtLocalVariable a, CtVariableAccess b) {
+        return result.containsEdge(a.getReference(), b.getVariable());
+    }
+
+    /**
+     * Indicates if a cyclic dependencies is to a non-local vars
+     * @return
+     */
+    private boolean cycleToLocalToStatement(CtLocalVariable a, CtVariableAccess b) {
+        return a.getReference().equals(b.getVariable()) &&
+                localToStatement.contains(b.getVariable());
     }
 
     @Override
@@ -92,9 +128,13 @@ public class DefChainCycleDetectorVisitor extends SignalLoopVisitors {
         if (localVariable.getDefaultExpression() != null) {
             List<CtVariableAccess> right = accessOfExpression(localVariable.getDefaultExpression());
             for (CtVariableAccess r : right) {
-                if (!result.containsVertex(r.getVariable())) result.addVertex(r.getVariable());
-                if (!result.containsEdge(localVariable.getReference(), r.getVariable()))
-                    result.addEdge(localVariable.getReference(), r.getVariable());
+                //Avoid repeated edges
+                if (!result.containsVertex(r.getVariable()))
+                    result.addVertex(r.getVariable());
+
+                //Avoid repeated edges and cycles to vars local to the block being analyzed
+                if ( !existEdge(localVariable, r) && !cycleToLocalToStatement(localVariable, r) )
+                        result.addEdge(localVariable.getReference(), r.getVariable());
             }
         }
     }

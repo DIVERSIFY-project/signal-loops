@@ -1,30 +1,44 @@
 package fr.inria.diverse.signalloops.detectors.logic;
 
+import org.apache.log4j.Logger;
 import org.jgrapht.alg.CycleDetector;
 import org.jgrapht.graph.DefaultEdge;
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;
 import spoon.reflect.reference.*;
 import spoon.reflect.visitor.filter.TypeFilter;
-import spoon.support.reflect.code.CtBlockImpl;
-import spoon.support.reflect.code.CtCodeSnippetStatementImpl;
+import spoon.support.reflect.code.*;
 
 import java.util.List;
 import java.util.Set;
 
+import static fr.inria.diverse.signalloops.detectors.logic.MutableEvaluatorVisitor.*;
+
 /**
- * Creates a new block by visiting an old one maintaining only the immutable statements
+ * Mutates a block by degrading it.
+ *
  * <p/>
  * Created by marodrig on 07/10/2015.
  */
-public class DegradedBlockVisitor extends SignalLoopVisitors {
+public class MutatorVisitor extends SignalLoopVisitors {
 
-    private static enum Mutability {IMMUTABLE, REPLACEABLE, ERASABLE}
+    private Logger log = Logger.getLogger(MutatorVisitor.class);
+
+
 
     private CycleDetector<CtVariableReference, DefaultEdge> cycleDetector;
 
-    private Set<CtVariableReference> localVariables;
+    /**
+     * Set of variables declared inside the block
+     */
+    private Set<CtVariableReference> declaredInsideBlock;
 
+    /**
+     * Indicates if an element contains no other elements inside
+     *
+     * @param statement
+     * @return
+     */
     private boolean isEmpty(CtElement statement) {
         boolean result = statement instanceof CtCodeSnippetStatement;
         result |= (statement instanceof CtBlock) && ((CtBlock) statement).getStatements().size() == 0;
@@ -32,7 +46,8 @@ public class DegradedBlockVisitor extends SignalLoopVisitors {
     }
 
     /**
-     * Indicates if the element contains unary operators acting on variables non-local to itself
+     * Indicates if the element contains unary operators acting on variables declared outside the
+     * block being degraded
      *
      * @param element Element to inspect
      * @return True if contains
@@ -42,8 +57,8 @@ public class DegradedBlockVisitor extends SignalLoopVisitors {
         for (CtUnaryOperator op :
                 element.getElements(new TypeFilter<CtUnaryOperator>(CtUnaryOperator.class))) {
             for (CtVariableAccess a : accessOfExpression(op)) {
-                //Add cyclic dependencies to external variables
-                if (!localVariables.contains(a.getVariable())) return true;
+                //We don't care about cyclic dependencies to vars declared inside the block being degraded
+                if (!declaredInsideBlock.contains(a.getVariable())) return true;
             }
         }
         return false;
@@ -61,7 +76,7 @@ public class DegradedBlockVisitor extends SignalLoopVisitors {
                 element.getElements(new TypeFilter<CtOperatorAssignment>(CtOperatorAssignment.class))) {
             for (CtVariableAccess a : accessOfExpression(op.getAssigned())) {
                 //Add cyclic dependencies
-                if (!localVariables.contains(a.getVariable())) return true;
+                if (!declaredInsideBlock.contains(a.getVariable())) return true;
             }
         }
         return false;
@@ -76,8 +91,11 @@ public class DegradedBlockVisitor extends SignalLoopVisitors {
     private void replaceByUnaryBlock(CtElement element) {
         CtBlock<CtUnaryOperator> opBlock = new CtBlockImpl<CtUnaryOperator>();
         for (CtUnaryOperator s : element.getElements(new TypeFilter<CtUnaryOperator>(CtUnaryOperator.class)))
-            if (s.getKind().compareTo(UnaryOperatorKind.POSTDEC) >= 0)
+            if (s.getKind().compareTo(UnaryOperatorKind.PREINC) >= 0) {
+                s.setParent(null);
                 opBlock.addStatement(s);
+                s.setParent(opBlock);
+            }
         element.replace(opBlock);
     }
 
@@ -109,21 +127,25 @@ public class DegradedBlockVisitor extends SignalLoopVisitors {
             for (CtVariableAccess access : left) {
                 CtVariableReference ref = access.getVariable();
                 try {
-                    if (!localVariables.contains(ref) && cycleDetector.detectCyclesContainingVertex(ref)) {
-                        result = Mutability.IMMUTABLE;
+                    if (!declaredInsideBlock.contains(ref) && cycleDetector.detectCyclesContainingVertex(ref)) {
+                        return Mutability.IMMUTABLE;
                     }
                 } catch (IllegalArgumentException ex) {
                     continue;
                 }
             }
         }
-        if (result == Mutability.ERASABLE) {
-            if (containNonLocalOperatorAssignment(statement)) return Mutability.IMMUTABLE;
-            else if (containsNonLocalUnaryOperators(statement)) return Mutability.REPLACEABLE;
-        }
-        return Mutability.ERASABLE;
+
+        if (containNonLocalOperatorAssignment(statement)) return Mutability.IMMUTABLE;
+        else if (containsNonLocalUnaryOperators(statement)) return Mutability.REPLACEABLE;
+        else return Mutability.ERASABLE;
     }
 
+    /**
+     * Remove an statement
+     *
+     * @param statement
+     */
     private void remove(CtStatement statement) {
         if (statement.getParent() instanceof CtBlock) {
             ((CtBlock) statement.getParent()).removeStatement(statement);
@@ -140,9 +162,46 @@ public class DegradedBlockVisitor extends SignalLoopVisitors {
      * @param e
      */
     private void defaultAction(CtStatement e) {
-        if (mutability(e) == Mutability.ERASABLE) remove(e);
-        if (mutability(e) == Mutability.REPLACEABLE) replaceByUnaryBlock(e);
+        Mutability m = mutability(e);
+        if (m == Mutability.ERASABLE) remove(e);
+        if (m == Mutability.REPLACEABLE) replaceByUnaryBlock(e);
+    }
 
+    /**
+     * Indicate if a variable is involved in a cycle containing non-local variables
+     * <p/>
+     * These cycles are immutable.
+     *
+     * @param ref
+     */
+    private boolean immutableCycle(CtVariableReference ref) {
+        Set<CtVariableReference> cycle = cycleDetector.findCyclesContainingVertex(ref);
+        for (CtVariableReference r : cycle) {
+            if (!declaredInsideBlock.contains(r)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Pretty print for the resulting degraded block
+     *
+     * @param clonedBody
+     * @return
+     */
+    public String prettyPrintBody(CtStatement clonedBody) {
+        String result = "";
+        if (clonedBody instanceof CtBlock) {
+            CtBlock block = (CtBlock) clonedBody;
+            try {
+                for (int i = 0; i < block.getStatements().size(); i++) {
+                    if (block.getStatement(i) instanceof CtBlock) result += prettyPrintBody(block.getStatement(i));
+                    else if (block.getStatement(i) != null) result += block.getStatement(i).toString() + ";\n";
+                }
+            } catch (NullPointerException ex) {
+              log.error("Unable to print the degraded loop!");
+            }
+        } else result = clonedBody.toString();
+        return result;
     }
 
     @Override
@@ -163,10 +222,29 @@ public class DegradedBlockVisitor extends SignalLoopVisitors {
 
 
     @Override
+    public <T> void visitCtLocalVariable(CtLocalVariable<T> localVariable) {
+        if (immutableCycle(localVariable.getReference())) {
+            //Is immutable, need to be replaced by an assignment
+            CtAssignment<T, T> replacement =
+                    localVariable.getFactory().Code().createVariableAssignment(
+                            localVariable.getReference(), false, localVariable.getDefaultExpression());
+            localVariable.replace(replacement);
+        } else defaultAction(localVariable);
+    }
+
+    @Override
     public void visitCtDo(CtDo doLoop) {
-        doLoop.getBody().accept(this);
-        doLoop.getLoopingExpression().accept(this);
-        if (isEmpty(doLoop.getLoopingExpression()) && isEmpty(doLoop.getBody())) remove(doLoop);
+        //Make background copy of the loop
+        CtDo clone = doLoop.getFactory().Core().clone(doLoop);
+
+        //Work over the copy
+        clone.getBody().accept(this);
+        clone.getLoopingExpression().accept(this);
+
+        //If the copy is erasable, so the original
+        if (isEmpty(clone.getLoopingExpression()) && isEmpty(clone.getBody())) {
+            remove(doLoop);
+        }
     }
 
 
@@ -174,7 +252,7 @@ public class DegradedBlockVisitor extends SignalLoopVisitors {
     public <T, A extends T> void visitCtOperatorAssignement(CtOperatorAssignment<T, A> assignment) {
         for (CtVariableAccess a : accessOfExpression(assignment.getAssigned())) {
             //Add cyclic dependencies
-            if (!localVariables.contains(a.getVariable())) {
+            if (!declaredInsideBlock.contains(a.getVariable())) {
                 remove(assignment);
                 return;
             }
@@ -185,25 +263,26 @@ public class DegradedBlockVisitor extends SignalLoopVisitors {
     public void visitCtIf(CtIf ifElement) {
         //super.visitCtIf(ifElement);
 
+        CtStatement ctThen = ifElement.getThenStatement();
+        CtStatement ctElse = ifElement.getElseStatement();
+
         Mutability condMut = mutability(ifElement.getCondition());
-        if (ifElement.getThenStatement() != null) ifElement.getThenStatement().accept(this);
-        if (ifElement.getElseStatement() != null) ifElement.getElseStatement().accept(this);
+        if (ctThen != null) ifElement.getThenStatement().accept(this);
+        if (ctElse != null) ifElement.getElseStatement().accept(this);
 
-        if (condMut == Mutability.ERASABLE && isEmpty(ifElement.getThenStatement())) {
+        if (condMut == Mutability.ERASABLE && isEmpty(ctThen)) {
             //if ( - ) {  } else {  } <- Remove the whole if
-            if (isEmpty(ifElement.getElseStatement())) remove(ifElement);
-                //if ( - ) {  } else { do }
-            else ifElement.getElseStatement().setParent(ifElement.getParent());
+            if (ctElse == null || isEmpty(ctElse)) remove(ifElement);
+                //else if case: if ( - ) {  } else if { doSomething() } <-- pull the else if element up
+            else if (ctElse instanceof CtIf) ctElse.setParent(ifElement.getParent());
         }
-
-        //if ( - ) {  } else { do }
     }
 
     @Override
     public <T> void visitCtUnaryOperator(CtUnaryOperator<T> operator) {
         for (CtVariableAccess a : accessOfExpression(operator)) {
             //Add cyclic dependencies to external variables
-            if (localVariables.contains(a.getVariable())) {
+            if (declaredInsideBlock.contains(a.getVariable())) {
                 remove(operator);
                 return;
             }
@@ -219,11 +298,11 @@ public class DegradedBlockVisitor extends SignalLoopVisitors {
         return cycleDetector;
     }
 
-    public void setLocalVariables(Set<CtVariableReference> localVariables) {
-        this.localVariables = localVariables;
+    public void setDeclaredInsideBlock(Set<CtVariableReference> declaredInsideBlock) {
+        this.declaredInsideBlock = declaredInsideBlock;
     }
 
-    public Set<CtVariableReference> getLocalVariables() {
-        return localVariables;
+    public Set<CtVariableReference> getDeclaredInsideBlock() {
+        return declaredInsideBlock;
     }
 }
