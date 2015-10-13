@@ -12,6 +12,7 @@ import java.util.HashMap;
 public class Main {
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
+
         <#list signal_loops as loop>
             <#if generator.existsDataFile(data_path, loop.microbenchmarkClassName) >
                 .include(${loop.microbenchmarkClassName}_ORIGINAL.class.getSimpleName())
