@@ -20,10 +20,27 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     ControlFlowGraph result = new ControlFlowGraph(ControlFlowEdge.class);
 
-    ControlFlowNode lastNode = null;
+    ControlFlowNode exitNode = new ControlFlowNode(null, result, EXIT);
+
+    ControlFlowNode beginNode = new ControlFlowNode(null, result, BEGIN);
+
+    ControlFlowNode lastNode = beginNode;
 
     public ControlFlowGraph getResult() {
         return result;
+    }
+
+
+    private void visitConditional(CtStatement parent, CtConditional conditional ) {
+        ControlFlowNode branch = new ControlFlowNode(conditional, result, BRANCH);
+        tryAddEdge(lastNode, branch);
+
+        ControlFlowNode convergenceNode = new ControlFlowNode(null, result, CONVERGE);
+        conditional.getThenExpression().accept(this);
+        tryAddEdge(lastNode, convergenceNode);
+
+        conditional.getElseExpression().accept(this);
+        tryAddEdge(lastNode, convergenceNode);
     }
 
     private void defaultAction(BranchKind kind, CtStatement st) {
@@ -85,7 +102,9 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     @Override
     public <T, A extends T> void visitCtAssignment(CtAssignment<T, A> assignement) {
-        defaultAction(STATEMENT, assignement);
+        if ( assignement.getAssignment() instanceof CtConditional ) {
+            visitConditional(assignement, (CtConditional)assignement.getAssignment());
+        } else defaultAction(STATEMENT, assignement);
     }
 
     @Override
@@ -93,28 +112,22 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     }
 
-    private void travelStatementList(ControlFlowNode firstNode, List<CtStatement> statements) {
-        tryAddEdge(lastNode, firstNode);
-        lastNode = firstNode;
-
+    private <R> void travelStatementList(List<CtStatement> statements) {
+        ControlFlowNode begin = new ControlFlowNode(null, result, BLOCK_BEGIN);
+        tryAddEdge(lastNode, begin);
+        lastNode = begin;
         for (CtStatement s : statements) {
-            ControlFlowNode before = lastNode;
             s.accept(this); // <- This should modify last node
-            tryAddEdge(before, lastNode); //Probably the link is already added
+            //tryAddEdge(before, lastNode); //Probably the link is already added
         }
+        ControlFlowNode end = new ControlFlowNode(null, result, BLOCK_END);
+        tryAddEdge(lastNode, end);
+        lastNode = end;
     }
 
     @Override
     public <R> void visitCtBlock(CtBlock<R> block) {
-        ControlFlowNode begin = new ControlFlowNode(block, result, BLOCK_BEGIN);
-        tryAddEdge(lastNode, begin);
-        lastNode = begin;
-
-        travelStatementList(begin, block.getStatements());
-
-        ControlFlowNode end = new ControlFlowNode(block, result, BLOCK_END);
-        tryAddEdge(lastNode, end);
-        lastNode = end;
+        travelStatementList(block.getStatements());
     }
 
     @Override
@@ -137,15 +150,7 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     @Override
     public <T> void visitCtConditional(CtConditional<T> conditional) {
-        ControlFlowNode branch = new ControlFlowNode(conditional, result, BRANCH);
-        tryAddEdge(lastNode, branch);
 
-        ControlFlowNode convergenceNode = new ControlFlowNode(null, result, CONVERGE);
-        conditional.getThenExpression().accept(this);
-        tryAddEdge(lastNode, convergenceNode);
-
-        conditional.getElseExpression().accept(this);
-        tryAddEdge(lastNode, convergenceNode);
     }
 
     @Override
@@ -162,15 +167,12 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
     public void visitCtDo(CtDo doLoop) {
         ControlFlowNode convergenceNode = new ControlFlowNode(null, result, CONVERGE);
         tryAddEdge(lastNode, convergenceNode);
-
-        doLoop.getBody().accept(this);
-
-        ControlFlowNode branch = new ControlFlowNode(doLoop, result, BRANCH);
-        tryAddEdge(lastNode, branch);
+        ControlFlowNode branch = new ControlFlowNode(doLoop.getLoopingExpression(), result, BRANCH);
         tryAddEdge(branch, convergenceNode);
+        lastNode = convergenceNode;
+        doLoop.getBody().accept(this);
+        tryAddEdge(lastNode, branch);
         lastNode = branch;
-
-
     }
 
     @Override
@@ -206,7 +208,9 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
     @Override
     public void visitCtFor(CtFor forLoop) {
         //Add the initialization code
-        travelStatementList(lastNode, forLoop.getForInit());
+        if ( forLoop.getForInit().size() > 1 )
+            travelStatementList(forLoop.getForInit());
+        else if ( forLoop.getForInit().size() > 0 ) forLoop.getForInit().get(0).accept(this);
 
         //Next the branch
         ControlFlowNode branch = new ControlFlowNode(forLoop.getExpression(), result, BRANCH);
@@ -217,7 +221,9 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
         forLoop.getBody().accept(this);
 
         //Append the update at the end
-        travelStatementList(lastNode, forLoop.getForUpdate());
+        if ( forLoop.getForUpdate().size() > 1 )
+            travelStatementList(forLoop.getForUpdate());
+        else if ( forLoop.getForUpdate().size() > 0 ) forLoop.getForUpdate().get(0).accept(this);
 
         //Link to the branch
         tryAddEdge(lastNode, branch);
@@ -226,6 +232,8 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
         lastNode = new ControlFlowNode(null, result, CONVERGE);
         tryAddEdge(branch, lastNode);
     }
+
+
 
     @Override
     public void visitCtForEach(CtForEach foreach) {
@@ -246,20 +254,24 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     @Override
     public void visitCtIf(CtIf ifElement) {
-        ControlFlowNode branch = new ControlFlowNode(ifElement, result, BRANCH);
+        ControlFlowNode branch = new ControlFlowNode(ifElement.getCondition(), result, BRANCH);
         tryAddEdge(lastNode, branch);
 
         ControlFlowNode convergenceNode = new ControlFlowNode(null, result, CONVERGE);
         if ( ifElement.getThenStatement() != null ) {
+            lastNode = branch;
             ifElement.getThenStatement().accept(this);
             tryAddEdge(lastNode, convergenceNode);
         }
 
         if ( ifElement.getElseStatement() != null ) {
+            lastNode = branch;
             ifElement.getElseStatement().accept(this);
             tryAddEdge(lastNode, convergenceNode);
-            tryAddEdge(lastNode, convergenceNode);
+        } else {
+            tryAddEdge(branch, convergenceNode);
         }
+        lastNode = convergenceNode;
     }
 
     @Override
@@ -279,7 +291,10 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     @Override
     public <T> void visitCtLocalVariable(CtLocalVariable<T> localVariable) {
-        defaultAction(STATEMENT, localVariable);
+        if ( localVariable.getDefaultExpression() instanceof CtConditional ) {
+            visitConditional(localVariable, (CtConditional)localVariable.getDefaultExpression());
+        }
+        else defaultAction(STATEMENT, localVariable);
     }
 
     @Override
@@ -289,7 +304,7 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     @Override
     public <T> void visitCtMethod(CtMethod<T> m) {
-
+        m.getBody().accept(this);
     }
 
     @Override
@@ -329,7 +344,10 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     @Override
     public <R> void visitCtReturn(CtReturn<R> returnStatement) {
-        defaultAction(STATEMENT, returnStatement);
+        ControlFlowNode n = new ControlFlowNode(returnStatement, result, STATEMENT);
+        tryAddEdge(lastNode, n);
+        tryAddEdge(n, exitNode);
+        lastNode = null; //Special case in which this node does not connect with the next, because is a return
     }
 
     @Override
@@ -339,7 +357,10 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     @Override
     public <S> void visitCtCase(CtCase<S> caseStatement) {
-        travelStatementList(new ControlFlowNode(caseStatement, result, STATEMENT), caseStatement.getStatements());
+        ControlFlowNode caseNode = new ControlFlowNode(caseStatement, result, STATEMENT);
+        tryAddEdge(lastNode, caseNode);
+        lastNode = caseNode;
+        travelStatementList(caseStatement.getStatements());
     }
 
     @Override
@@ -367,12 +388,12 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     @Override
     public void visitCtThrow(CtThrow throwStatement) {
-
+        //TODO:implement this
     }
 
     @Override
     public void visitCtTry(CtTry tryBlock) {
-
+        //TODO:implement this
     }
 
     @Override
@@ -392,7 +413,7 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
 
     @Override
     public <T> void visitCtUnaryOperator(CtUnaryOperator<T> operator) {
-
+        defaultAction(STATEMENT, operator);
     }
 
     @Override
@@ -403,13 +424,14 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
     @Override
     public void visitCtWhile(CtWhile whileLoop) {
         ControlFlowNode convergenceNode = new ControlFlowNode(null, result, CONVERGE);
-        ControlFlowNode branch = new ControlFlowNode(whileLoop, result, BRANCH);
-
-        whileLoop.getBody().accept(this);
+        ControlFlowNode branch = new ControlFlowNode(whileLoop.getLoopingExpression(), result, BRANCH);
 
         tryAddEdge(lastNode, branch);
-
         tryAddEdge(branch, convergenceNode);
+        lastNode = branch;
+        whileLoop.getBody().accept(this);
+        tryAddEdge(lastNode, convergenceNode);
+        lastNode = convergenceNode;
     }
 
     @Override

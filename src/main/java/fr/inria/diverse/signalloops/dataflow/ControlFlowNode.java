@@ -7,12 +7,19 @@ import spoon.reflect.declaration.CtElement;
 import java.util.ArrayList;
 import java.util.List;
 
+import static fr.inria.diverse.signalloops.dataflow.BranchKind.CONVERGE;
+
 /**
  * A node of the control flow
+ * <p/>
  * <p/>
  * Created by marodrig on 13/10/2015.
  */
 public class ControlFlowNode {
+
+    public static int count = 0;
+
+    private int id;
 
     /**
      * Çontrol flow graph containing this node
@@ -47,12 +54,16 @@ public class ControlFlowNode {
         this.kind = kind;
         this.parent = parent;
         this.statement = statement;
+        ++count;
+        id = count;
     }
 
 
     public ControlFlowNode(CtElement statement, ControlFlowGraph parent) {
         this.statement = statement;
         this.parent = parent;
+        ++count;
+        id = count;
     }
 
     /**
@@ -144,5 +155,11 @@ public class ControlFlowNode {
 
     public void setParent(ControlFlowGraph parent) {
         this.parent = parent;
+    }
+
+    @Override
+    public String toString() {
+        if (statement != null) return id + " - " + statement.toString();
+        else return kind + "_" + id;
     }
 }
