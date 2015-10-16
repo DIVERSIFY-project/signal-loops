@@ -21,11 +21,18 @@ public class ControlFlowArithmetic {
         return a + b * 2;
     }
 
+    //several constructions one after the other
+    public int invocation(int a, int b) {
+        if (b % 2 == 0) {
+            return nestedIfs(a,b);
+        }
+        return a + b * 2;
+    }
+
     //Some nested ifs
     public int nestedIfs(int a, int b) {
         if (a > 0) {
             if (b > 0) return a * b;
-            else return 0;
         } else {
             if (b < 0) return a * b * b;
             else {
@@ -34,11 +41,18 @@ public class ControlFlowArithmetic {
                 return b;
             }
         }
+        return 0;
     }
 
     public void returnVoid(int a) {
         if (a > 0) return;
         else System.out.print("A < 0!");
+    }
+
+    public int nestedConditional(int a) {
+        int k = a / 2;
+        int b = a > 0 ? k < 4 ? a * a : 8 : -a * a;
+        return b;
     }
 
     public int conditional(int a) {
@@ -168,4 +182,24 @@ public class ControlFlowArithmetic {
         a = a + a / 2;
         return 10 * a;
     }
+
+    public int testCase(boolean armed, double inputs1, double inputs2, double THRESHOLD) {
+        int count = 0;
+        double value = inputs1;
+        if (value < -THRESHOLD) {
+            armed = true;
+        } else if (armed & (value > THRESHOLD)) {
+            ++count;
+            armed = false;
+        }
+        value = inputs2;
+        if (value < -THRESHOLD) {
+            armed = true;
+        } else if (armed & (value > THRESHOLD)) {
+            ++count;
+            armed = false;
+        }
+        return count;
+    }
+
 }

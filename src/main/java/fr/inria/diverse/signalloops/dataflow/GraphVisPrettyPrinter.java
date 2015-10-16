@@ -2,10 +2,7 @@ package fr.inria.diverse.signalloops.dataflow;
 
 import java.util.HashMap;
 
-import static fr.inria.diverse.signalloops.dataflow.BranchKind.BRANCH;
-import static fr.inria.diverse.signalloops.dataflow.BranchKind.CONVERGE;
-import static fr.inria.diverse.signalloops.dataflow.BranchKind.EXIT;
-import static fr.inria.diverse.signalloops.dataflow.BranchKind.BEGIN;
+import static fr.inria.diverse.signalloops.dataflow.BranchKind.*;
 
 /**
  * Prints the control flow in .Dot for GraphVis to visualize
@@ -46,6 +43,8 @@ public class GraphVisPrettyPrinter {
         String labelStr = " [shape=rectangle, label=\"";
         if ( n.getKind() == BRANCH ) labelStr = " [shape=diamond, label=\"";
         else if ( n.getKind() == BEGIN ) labelStr = " [shape=Mdiamond, label=\"";
+        else if ( n.getKind() == BLOCK_BEGIN || n.getKind() == BLOCK_END )
+            labelStr = " [shape=rectangle, style=filled, fillcolor=gray, label=\"";
         else if ( n.getKind() == EXIT ) labelStr = " [shape=doublecircle, label=\"";
         else if ( n.getKind() == CONVERGE ) labelStr = " [shape=point label=\"";
 

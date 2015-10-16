@@ -4,17 +4,9 @@ import fr.inria.diversify.syringe.SpoonMetaFactory;
 import org.junit.Test;
 import spoon.processing.AbstractProcessor;
 import spoon.processing.ProcessingManager;
-import spoon.reflect.code.CtLoop;
-import spoon.reflect.code.CtVariableAccess;
 import spoon.reflect.declaration.CtMethod;
 import spoon.reflect.factory.Factory;
-import spoon.reflect.visitor.filter.TypeFilter;
 import spoon.support.QueueProcessingManager;
-
-import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.net.URISyntaxException;
-import java.util.List;
 
 import static fr.inria.diverse.signalloops.dataflow.BranchKind.BRANCH;
 import static fr.inria.diverse.signalloops.dataflow.BranchKind.STATEMENT;
@@ -26,7 +18,7 @@ import static junit.framework.Assert.assertEquals;
 public class ForwardFlowBuilderVisitorTest {
 
     public ControlFlowGraph testMethod(final String methodName, boolean simplify,
-                                       int branchCount, int stmntCount, int totalCount) throws Exception {
+                                       Integer branchCount, Integer stmntCount, Integer totalCount) throws Exception {
 
         final ForwardFlowBuilderVisitor visitor = new ForwardFlowBuilderVisitor();
 
@@ -46,13 +38,13 @@ public class ForwardFlowBuilderVisitorTest {
 
 
         ControlFlowGraph graph = visitor.getResult();
-        if (simplify) graph.simplify();
+        if (simplify) graph.simplifyConvergenceNodes();
 
         System.out.println(graph.toGraphVisText());
 
-        assertEquals(totalCount, graph.vertexSet().size());
-        assertEquals(branchCount, graph.branchCount());
-        assertEquals(stmntCount, graph.statementCount());
+        if (totalCount != null) assertEquals((int) totalCount, graph.vertexSet().size());
+        if (branchCount != null) assertEquals((int) branchCount, graph.branchCount());
+        if (stmntCount != null) assertEquals((int) stmntCount, graph.statementCount());
 
 
         return graph;
@@ -65,12 +57,13 @@ public class ForwardFlowBuilderVisitorTest {
         out.println(graph.toGraphVisText());
         out.close();
 
-        graph.simplify();
+        graph.simplifyConvergenceNodes();
         PrintWriter out2 = new PrintWriter("C:\\MarcelStuff\\DATA\\graphsimplified.dot");
         out2.println(graph.toGraphVisText());
         out2.close();*/
 
     }
+
 
     /**
      * Test some topology properties
@@ -232,7 +225,7 @@ public class ForwardFlowBuilderVisitorTest {
         //branchCount, stmntCount, totalCount
         ControlFlowGraph graph = testMethod("ctDoWhileBlock", true, 1, 5, 11);
         //Branches-Statement Branches-Branches sStatement-Statement total
-        testEdges(graph, 2, 0, 2, null);
+        testEdges(graph, 1, 0, 2, null);
     }
 
     @Test
@@ -246,8 +239,42 @@ public class ForwardFlowBuilderVisitorTest {
     @Test
     public void testConditional() throws Exception {
         //branchCount, stmntCount, totalCount
-        ControlFlowGraph graph = testMethod("conditional", false, 1, 4, 9);
+        ControlFlowGraph graph = testMethod("conditional", false, 1, 3, 8);
         //Branches-Statement Branches-Branches sStatement-Statement total
-        testEdges(graph, 1, 0, 1, null);
+        testEdges(graph, 2, 0, 0, null);
+    }
+
+    @Test
+    public void testNestedConditional() throws Exception {
+        //branchCount, stmntCount, totalCount
+        ControlFlowGraph graph = testMethod("nestedConditional", false, 2, 5, 12);
+        //Branches-Statement Branches-Branches sStatement-Statement total
+        testEdges(graph, 3, 1, 0, null);
+    }
+
+    @Test
+    public void testNestedIf() throws Exception {
+        //branchCount, stmntCount, totalCount
+        ControlFlowGraph graph = testMethod("nestedIfs", false, 3, 6, null);
+        //Branches-Statement Branches-Branches sStatement-Statement total
+        testEdges(graph, 2, 0, 2, null);
+    }
+
+    @Test
+    public void testInvocation() throws Exception {
+        //branchCount, stmntCount, totalCount
+        ControlFlowGraph graph = testMethod("invocation", false, 3, 6, null);
+        //Branches-Statement Branches-Branches sStatement-Statement total
+        testEdges(graph, 2, 0, 2, null);
+    }
+
+    @Test
+    public void testtestCase() throws Exception {
+        //branchCount, stmntCount, totalCount
+        ControlFlowGraph graph = testMethod("testCase", true, null, null, null);
+        graph.simplifyBlockNodes();
+        System.out.println(graph.toGraphVisText());
+        //Branches-Statement Branches-Branches sStatement-Statement total
+        //testEdges(graph, 2, 0, 2, null);
     }
 }

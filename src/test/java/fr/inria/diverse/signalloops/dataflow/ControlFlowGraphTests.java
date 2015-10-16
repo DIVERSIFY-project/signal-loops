@@ -46,7 +46,7 @@ public class ControlFlowGraphTests {
         graph.addEdge(node1, fictitious);
         graph.addEdge(fictitious, node2);
 
-        graph.simplify();
+        graph.simplifyConvergenceNodes();
 
         assertTrue(graph.containsEdge(branch1, node2));
         assertTrue(graph.containsEdge(branch2, node2));
@@ -90,7 +90,7 @@ public class ControlFlowGraphTests {
         graph.addEdge(fictitious, fictitious2);
         graph.addEdge(fictitious2, node2);
 
-        graph.simplify();
+        graph.simplifyConvergenceNodes();
 
         assertTrue(graph.containsEdge(branch1, node2));
         assertTrue(graph.containsEdge(branch2, node2));

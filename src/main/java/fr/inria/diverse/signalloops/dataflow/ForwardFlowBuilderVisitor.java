@@ -31,16 +31,29 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
     }
 
 
-    private void visitConditional(CtStatement parent, CtConditional conditional ) {
-        ControlFlowNode branch = new ControlFlowNode(conditional, result, BRANCH);
+    private void visitConditional(CtElement parent, CtConditional conditional ) {
+        ControlFlowNode branch = new ControlFlowNode(parent, result, BRANCH);
         tryAddEdge(lastNode, branch);
 
         ControlFlowNode convergenceNode = new ControlFlowNode(null, result, CONVERGE);
-        conditional.getThenExpression().accept(this);
+        lastNode = branch;
+        if ( conditional.getThenExpression() instanceof CtConditional )
+            visitConditional(conditional, (CtConditional)conditional.getThenExpression());
+        else {
+            lastNode = new ControlFlowNode(conditional.getThenExpression(), result, STATEMENT);
+            tryAddEdge(branch, lastNode);
+        }
         tryAddEdge(lastNode, convergenceNode);
 
-        conditional.getElseExpression().accept(this);
+        lastNode = branch;
+        if ( conditional.getElseExpression() instanceof CtConditional )
+            visitConditional(conditional, (CtConditional)conditional.getElseExpression());
+        else {
+            lastNode = new ControlFlowNode(conditional.getElseExpression(), result, STATEMENT);
+            tryAddEdge(branch, lastNode);
+        }
         tryAddEdge(lastNode, convergenceNode);
+        lastNode = convergenceNode;
     }
 
     private void defaultAction(BranchKind kind, CtStatement st) {
@@ -48,6 +61,8 @@ public class ForwardFlowBuilderVisitor implements CtVisitor {
         tryAddEdge(lastNode, n);
         lastNode = n;
     }
+
+
 
     /**
      * Tries to add an edge. If source or target are not null and the vertex is unique

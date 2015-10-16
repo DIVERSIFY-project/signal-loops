@@ -7,9 +7,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import static fr.inria.diverse.signalloops.dataflow.BranchKind.BRANCH;
-import static fr.inria.diverse.signalloops.dataflow.BranchKind.CONVERGE;
-import static fr.inria.diverse.signalloops.dataflow.BranchKind.STATEMENT;
+import static fr.inria.diverse.signalloops.dataflow.BranchKind.*;
 
 /**
  * Created by marodrig on 13/10/2015.
@@ -75,11 +73,8 @@ public class ControlFlowGraph extends DefaultDirectedGraph<ControlFlowNode, Cont
         return findNodesOfKind(BRANCH);
     }
 
-    /**
-     * Removes all convergence nodes
-     */
-    public void simplify() {
-        List<ControlFlowNode> convergence = findNodesOfKind(CONVERGE);
+    private void simplify(BranchKind kind) {
+        List<ControlFlowNode> convergence = findNodesOfKind(kind);
         for (ControlFlowNode n : convergence) {
             Set<ControlFlowEdge> incoming = incomingEdgesOf(n);
             Set<ControlFlowEdge> outgoing = outgoingEdgesOf(n);
@@ -90,7 +85,21 @@ public class ControlFlowGraph extends DefaultDirectedGraph<ControlFlowNode, Cont
             for (ControlFlowEdge e : edgesOf(n)) removeEdge(e);
             removeVertex(n);
         }
+    }
 
+    /**
+     * Removes all blocks
+     */
+    public void simplifyBlockNodes() {
+        simplify(BLOCK_BEGIN);
+        simplify(BLOCK_END);
+    }
+
+    /**
+     * Removes all convergence nodes
+     */
+    public void simplifyConvergenceNodes() {
+        simplify(CONVERGE);
     }
 
     public int branchCount() {
