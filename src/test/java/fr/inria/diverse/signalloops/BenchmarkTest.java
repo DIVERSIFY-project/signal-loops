@@ -1,15 +1,21 @@
 package fr.inria.diverse.signalloops;
 
+import fr.inria.diverse.signalloops.codegenerators.MicrobenchmarkGenerator;
 import fr.inria.diverse.signalloops.model.SignalLoop;
 import fr.inria.diversify.syringe.SpoonMetaFactory;
 import spoon.processing.AbstractProcessor;
 import spoon.processing.ProcessingManager;
+import spoon.reflect.code.CtArrayAccess;
+import spoon.reflect.code.CtIf;
 import spoon.reflect.code.CtLoop;
 import spoon.reflect.code.CtVariableAccess;
+import spoon.reflect.declaration.CtElement;
 import spoon.reflect.factory.Factory;
+import spoon.reflect.visitor.Filter;
 import spoon.reflect.visitor.filter.TypeFilter;
 import spoon.support.QueueProcessingManager;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -46,5 +52,7 @@ public class BenchmarkTest {
 
         return theLoop;
     }
+
+
 
 }

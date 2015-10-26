@@ -5,6 +5,8 @@ import spoon.reflect.declaration.*;
 import spoon.reflect.reference.*;
 import spoon.reflect.visitor.CtVisitor;
 import spoon.reflect.visitor.filter.TypeFilter;
+import spoon.support.reflect.code.CtBlockImpl;
+import spoon.support.reflect.code.CtBreakImpl;
 
 import java.lang.annotation.Annotation;
 import java.util.List;

@@ -84,6 +84,9 @@ public class MutableEvaluatorVisitor extends SignalLoopVisitors {
         List<CtVariableAccess> right = accessOfExpression(assignement.getAssignment());
         //Create a graph such as there is an edge when a variable depends of another in some point
         //in the code.
+        /**
+         * @branch-in: template1, configurationA
+         */
         for (CtVariableAccess l : left) {
             if (!result.containsVertex(l.getVariable())) result.addVertex(l.getVariable());
             for (CtVariableAccess r : right) {
@@ -100,7 +103,9 @@ public class MutableEvaluatorVisitor extends SignalLoopVisitors {
 
             if (l.getVariable() instanceof CtLocalVariable) visitCtLocalVariable((CtLocalVariable) l.getVariable());
         }
-
+        /**
+         * @branch-out
+         */
     }
 
     /**

@@ -183,7 +183,10 @@ public class ControlFlowArithmetic {
         return 10 * a;
     }
 
-    public int testCase(boolean armed, double inputs1, double inputs2, double THRESHOLD) {
+    ///////////////////////////////////////////////////////////////////////////////////////////
+
+
+    public int testCase1(boolean armed, double inputs1, double inputs2, double THRESHOLD) {
         int count = 0;
         double value = inputs1;
         if (value < -THRESHOLD) {
@@ -200,6 +203,37 @@ public class ControlFlowArithmetic {
             armed = false;
         }
         return count;
+    }
+
+    double method1() {
+        return 0;
+    }
+
+    double method2(double a) {
+        return a;
+    }
+
+    boolean m3() {
+        return true;
+    }
+
+    public void complex1(double phase, double source, double target, double baseIncrement, boolean starved, int i,
+                         double current, double[] outputs,double[] amplitudes, double[] rates) {
+        if ((phase) >= 1.0) {
+            while ((phase) >= 1.0) {
+                source = target;
+                phase -= 1.0;
+                baseIncrement = method1();
+            }
+        } else if ((i == 0) && ((starved) || (!(m3())))) {
+            source = target = current;
+            phase = 0.0;
+            baseIncrement = method1();
+        }
+        current = (((target) - (source)) * (phase)) + (source);
+        outputs[i] = (current) * (amplitudes[i]);
+        double phaseIncrement = (baseIncrement) * (rates[i]);
+        phase += method2(phaseIncrement);
     }
 
 }

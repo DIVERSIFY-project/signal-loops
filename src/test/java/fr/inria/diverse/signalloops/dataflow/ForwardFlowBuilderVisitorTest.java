@@ -271,10 +271,13 @@ public class ForwardFlowBuilderVisitorTest {
     @Test
     public void testtestCase() throws Exception {
         //branchCount, stmntCount, totalCount
-        ControlFlowGraph graph = testMethod("testCase", true, null, null, null);
+        ControlFlowGraph graph = testMethod("complex1", true, null, null, null);
         graph.simplifyBlockNodes();
         System.out.println(graph.toGraphVisText());
         //Branches-Statement Branches-Branches sStatement-Statement total
         //testEdges(graph, 2, 0, 2, null);
     }
+
+
+
 }
